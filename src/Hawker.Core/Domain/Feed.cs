@@ -13,6 +13,9 @@ public class Feed
     /// <summary>Fetch the linked page and extract the full article rather than relying on the RSS summary.</summary>
     public bool FetchFullText { get; set; } = true;
 
+    /// <summary>Leave out rolling live-update pages, which extract as long runs of timestamped fragments.</summary>
+    public bool SkipLiveBlogs { get; set; } = true;
+
     public ScoreSource ScoreSource { get; set; } = ScoreSource.Auto;
 
     /// <summary>Used when <see cref="ScoreSource"/> is Regex. Must contain a named group "score"; "comments" is optional.</summary>

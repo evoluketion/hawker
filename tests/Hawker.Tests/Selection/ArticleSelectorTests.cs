@@ -113,6 +113,23 @@ public class ArticleSelectorTests
     }
 
     [Fact]
+    public void Live_blogs_are_skipped_only_for_feeds_that_ask()
+    {
+        var items = new[]
+        {
+            Item("Europe – live", 1, feedId: 1),
+            Item("story", 2, feedId: 1),
+            Item("Politics – live", 1, feedId: 2),
+        };
+        var rules = new Dictionary<int, FeedRules> { [1] = new(null, null, SkipLiveBlogs: true) };
+
+        var result = ArticleSelector.Select(items, Options(), rules, NothingSeen);
+
+        Assert.Equal(["Politics – live", "story"], Titles(result));
+        Assert.Contains("Skipped 1 live blog.", result.Notes);
+    }
+
+    [Fact]
     public void Undated_items_count_as_new_and_future_dates_are_clamped()
     {
         var undated = Item("undated", 0) with { Published = null };

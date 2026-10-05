@@ -10,9 +10,9 @@ public sealed record SelectionOptions(int ArticleCount, SortMode SortMode, TimeS
 }
 
 /// <summary>Per-feed rules applied during selection.</summary>
-public sealed record FeedRules(int? MaxItemsPerRun, int? MinScore)
+public sealed record FeedRules(int? MaxItemsPerRun, int? MinScore, bool SkipLiveBlogs = false)
 {
-    public static FeedRules For(Feed feed) => new(feed.MaxItemsPerRun, feed.MinScore);
+    public static FeedRules For(Feed feed) => new(feed.MaxItemsPerRun, feed.MinScore, feed.SkipLiveBlogs);
 }
 
 public sealed record SelectedArticle(FeedItem Item, string UrlHash, DateTimeOffset EffectivePublished);
@@ -20,9 +20,9 @@ public sealed record SelectedArticle(FeedItem Item, string UrlHash, DateTimeOffs
 public sealed record SelectionResult(IReadOnlyList<SelectedArticle> Articles, IReadOnlyList<string> Notes);
 
 /// <summary>
-/// Picks the articles for one edition: drops anything outside the look-back range, below a feed's minimum score
-/// or already printed, removes duplicates, ranks by recency or popularity, then takes the top N while honouring
-/// per-feed caps.
+/// Picks the articles for one edition: drops anything outside the look-back range, live blogs (where the feed asks),
+/// anything below a feed's minimum score or already printed, removes duplicates, ranks by recency or popularity,
+/// then takes the top N while honouring per-feed caps.
 /// </summary>
 public static class ArticleSelector
 {
@@ -44,7 +44,8 @@ public static class ArticleSelector
             .ToList();
 
         var inRange = all.Where(a => a.EffectivePublished >= cutoff).ToList();
-        var aboveMin = inRange.Where(a => rulesFor(a.Item.FeedId).MinScore is not { } min || a.Item.Score is not { } s || s >= min).ToList();
+        var notLive = inRange.Where(a => !rulesFor(a.Item.FeedId).SkipLiveBlogs || !LiveBlogDetector.IsLiveBlog(a.Item)).ToList();
+        var aboveMin = notLive.Where(a => rulesFor(a.Item.FeedId).MinScore is not { } min || a.Item.Score is not { } s || s >= min).ToList();
         var unseen = aboveMin.Where(a => !seenHashes.Contains(a.UrlHash)).ToList();
 
         // The same story can arrive from two feeds; keep the copy with the higher score.
@@ -54,7 +55,11 @@ public static class ArticleSelector
             .ToList();
 
         AddNote(notes, all.Count - inRange.Count, "older than the look-back range");
-        AddNote(notes, inRange.Count - aboveMin.Count, "below their feed's minimum score");
+        if (inRange.Count - notLive.Count is var live and > 0)
+        {
+            notes.Add($"Skipped {live} live blog{(live == 1 ? "" : "s")}.");
+        }
+        AddNote(notes, notLive.Count - aboveMin.Count, "below their feed's minimum score");
         AddNote(notes, aboveMin.Count - unseen.Count, "already printed in this edition");
         AddNote(notes, unseen.Count - pool.Count, "that duplicated another feed's story");
 
