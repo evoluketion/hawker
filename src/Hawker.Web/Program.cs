@@ -6,6 +6,7 @@ using Hawker.Core.Feeds;
 using Hawker.Core.Selection;
 using Hawker.Web.Components;
 using Hawker.Web.Editions;
+using Hawker.Web.Printing;
 using Hawker.Web.Rendering;
 using Hawker.Web.Settings;
 using Microsoft.AspNetCore.DataProtection;
@@ -58,6 +59,16 @@ builder.Services.Configure<PdfOptions>(builder.Configuration.GetSection("Hawker:
 builder.Services.AddSingleton<NewspaperRenderer>();
 builder.Services.AddSingleton<PdfRenderer>();
 builder.Services.AddTransient<EditionComposer>();
+builder.Services.Configure<PrintingOptions>(builder.Configuration.GetSection("Hawker:Printing"));
+builder.Services.AddSingleton<IProcessRunner, ProcessRunner>();
+if (OperatingSystem.IsWindows())
+{
+    builder.Services.AddSingleton<IPrintService, WindowsPrintService>();
+}
+else
+{
+    builder.Services.AddSingleton<IPrintService, CupsPrintService>();
+}
 
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
