@@ -64,6 +64,10 @@ public sealed partial class CupsPrintService(IProcessRunner runner, ILogger<Cups
         {
             throw new PrintException($"'{command}' was not found. Install CUPS (the cups-client package) to print.", ex);
         }
+        catch (TimeoutException ex)
+        {
+            throw new PrintException(PrintException.TimedOutMessage, ex);
+        }
     }
 
     private static string? FirstLine(string text) =>

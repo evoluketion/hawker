@@ -74,6 +74,27 @@ public class PrintServiceTests
     }
 
     [Fact]
+    public async Task A_timed_out_print_warns_to_check_before_reprinting()
+    {
+        var runner = new FakeRunner((_, _) => throw new TimeoutException("lp did not finish"));
+        var service = new CupsPrintService(runner, NullLogger<CupsPrintService>.Instance);
+
+        var error = await Assert.ThrowsAsync<PrintException>(() => service.PrintAsync("/tmp/x.pdf", OfficeDuplexA4));
+        Assert.Equal(PrintException.TimedOutMessage, error.Message);
+        Assert.Single(runner.Calls); // never retried
+    }
+
+    [Fact]
+    public async Task A_failed_print_is_attempted_exactly_once()
+    {
+        var runner = new FakeRunner((_, _) => new ProcessResult(1, "", "lp: Unable to print."));
+        var service = new CupsPrintService(runner, NullLogger<CupsPrintService>.Instance);
+
+        await Assert.ThrowsAsync<PrintException>(() => service.PrintAsync("/tmp/x.pdf", OfficeDuplexA4));
+        Assert.Single(runner.Calls);
+    }
+
+    [Fact]
     public async Task Cups_lists_printers_and_marks_the_default()
     {
         var runner = new FakeRunner((_, args) => args[0] == "-e"

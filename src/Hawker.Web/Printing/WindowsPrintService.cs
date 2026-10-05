@@ -35,7 +35,20 @@ public sealed class WindowsPrintService(IProcessRunner runner, IOptions<Printing
         var sumatra = FindSumatra(options.Value.SumatraPath)
             ?? throw new PrintException("SumatraPDF was not found. Install it, or set Hawker:Printing:SumatraPath to SumatraPDF.exe.");
 
-        var result = await runner.RunAsync(sumatra, BuildArguments(pdfPath, printOptions), PrintTimeout, cancellationToken);
+        ProcessResult result;
+        try
+        {
+            result = await runner.RunAsync(sumatra, BuildArguments(pdfPath, printOptions), PrintTimeout, cancellationToken);
+        }
+        catch (System.ComponentModel.Win32Exception ex)
+        {
+            throw new PrintException($"SumatraPDF could not be started from {sumatra}: {ex.Message}", ex);
+        }
+        catch (TimeoutException ex)
+        {
+            throw new PrintException(PrintException.TimedOutMessage, ex);
+        }
+
         if (result.ExitCode != 0)
         {
             var detail = string.IsNullOrWhiteSpace(result.StandardError) ? $"exit code {result.ExitCode}" : result.StandardError.Trim();

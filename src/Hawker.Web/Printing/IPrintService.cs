@@ -14,7 +14,15 @@ public sealed record PrintOptions(string? PrinterName, int Copies, bool Duplex, 
 /// <param name="JobId">The print system's job reference, when it reports one.</param>
 public sealed record PrintResult(string Printer, string? JobId);
 
-public sealed class PrintException(string message, Exception? inner = null) : Exception(message, inner);
+public sealed class PrintException(string message, Exception? inner = null) : Exception(message, inner)
+{
+    /// <summary>
+    /// A command that hangs may already have handed the job to the printer, and Hawker never retries prints, so the
+    /// message tells the reader to check before reprinting.
+    /// </summary>
+    public const string TimedOutMessage =
+        "The print command did not finish in time. The job may still have reached the printer, so check before reprinting.";
+}
 
 /// <summary>Sends a finished PDF to a printer.</summary>
 public interface IPrintService
