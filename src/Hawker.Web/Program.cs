@@ -1,5 +1,6 @@
 using System.Net;
 using Hawker.Core;
+using Hawker.Core.Articles;
 using Hawker.Core.Data;
 using Hawker.Core.Feeds;
 using Hawker.Core.Selection;
@@ -39,14 +40,15 @@ if (OperatingSystem.IsWindows())
 }
 
 builder.Services.AddSingleton(TimeProvider.System);
-builder.Services.AddHttpClient<FeedFetcher>(http =>
-    {
-        http.Timeout = TimeSpan.FromSeconds(30);
-        http.DefaultRequestHeaders.UserAgent.ParseAdd("Hawker/1.0 (+personal newspaper)");
-    })
-    .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { AutomaticDecompression = DecompressionMethods.All });
+builder.Services.AddHttpClient<FeedFetcher>(http => ConfigureHttp(http, TimeSpan.FromSeconds(30)))
+    .ConfigurePrimaryHttpMessageHandler(CreateHandler);
+builder.Services.AddHttpClient<PageExtractor>(http => ConfigureHttp(http, TimeSpan.FromSeconds(30)))
+    .ConfigurePrimaryHttpMessageHandler(CreateHandler);
+builder.Services.AddHttpClient<ImageProcessor>(http => ConfigureHttp(http, TimeSpan.FromSeconds(30)))
+    .ConfigurePrimaryHttpMessageHandler(CreateHandler);
 builder.Services.AddSingleton<SeenArticleStore>();
 builder.Services.AddTransient<StorySelectionService>();
+builder.Services.AddTransient<ArticlePreparationService>();
 
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
@@ -77,3 +79,17 @@ static string DefaultDataDirectory() =>
     OperatingSystem.IsWindows()
         ? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData), "Hawker")
         : Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "hawker");
+
+static void ConfigureHttp(HttpClient http, TimeSpan timeout)
+{
+    http.Timeout = timeout;
+    // Many news sites refuse requests that don't look like a browser.
+    http.DefaultRequestHeaders.UserAgent.ParseAdd("Mozilla/5.0 (compatible; Hawker/1.0; personal newspaper)");
+    http.DefaultRequestHeaders.Accept.ParseAdd("text/html,application/xhtml+xml,application/xml;q=0.9,image/*;q=0.8,*/*;q=0.7");
+}
+
+static HttpMessageHandler CreateHandler() => new SocketsHttpHandler
+{
+    AutomaticDecompression = DecompressionMethods.All,
+    PooledConnectionLifetime = TimeSpan.FromMinutes(5),
+};
