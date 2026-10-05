@@ -13,6 +13,9 @@ public sealed class ArticlePreparationService(PageExtractor extractor, ImageProc
     /// <summary>Body images beyond this are dropped; a printed story rarely has room for more.</summary>
     private const int MaxBodyImages = 3;
 
+    /// <summary>A lead candidate at least this wide is used without looking further down the preference list.</summary>
+    private const int PreferredLeadWidth = 450;
+
     /// <summary>Hosts whose item pages are discussion threads rather than articles; the feed's own text is used instead.</summary>
     private static readonly string[] NoExtractHosts = ["news.ycombinator.com", "reddit.com", "lobste.rs"];
 
@@ -61,17 +64,39 @@ public sealed class ArticlePreparationService(PageExtractor extractor, ImageProc
             notes.Add($"“{article.Title}”: no article text was available, so it will print as a headline only.");
         }
 
-        var bodyImages = await Task.WhenAll(article.BodyImages.Take(MaxBodyImages)
-            .Select(i => images.ProcessAsync(i, imageOptions, cancellationToken)));
-        var usable = bodyImages.OfType<ArticleImage>().ToList();
+        var processed = new Dictionary<string, ArticleImage?>();
+        foreach (var (image, result) in await ProcessAllAsync(article.BodyImages.Take(MaxBodyImages), imageOptions, cancellationToken))
+        {
+            processed[image.Id] = result;
+        }
 
-        var leads = await Task.WhenAll(article.LeadImageCandidates.Select(i => images.ProcessAsync(i, imageOptions, cancellationToken)));
-        var lead = leads.OfType<ArticleImage>().MaxBy(i => i.Width * i.Height);
+        // Lead: the first candidate big enough to print well wins; otherwise the biggest that worked.
+        var leadResults = new List<ArticleImage>();
+        foreach (var candidate in article.LeadImageCandidates)
+        {
+            if (!processed.TryGetValue(candidate.Id, out var result))
+            {
+                result = await images.ProcessAsync(candidate, imageOptions, cancellationToken);
+            }
+
+            if (result is not null)
+            {
+                leadResults.Add(result);
+            }
+        }
+
+        var lead = leadResults.FirstOrDefault(i => i.Width >= PreferredLeadWidth) ?? leadResults.MaxBy(i => i.Width * i.Height);
+        var usable = article.BodyImages.Select(i => processed.GetValueOrDefault(i.Id)).OfType<ArticleImage>().ToList();
         if (lead is null && usable.Count > 0)
         {
-            // The preferred lead failed (or was an icon); promote the first good body image instead.
-            lead = usable[0] with { Id = $"{id}-lead" };
-            usable.RemoveAt(0);
+            // Every candidate failed (or was an icon); promote the first good body image instead.
+            lead = usable[0];
+        }
+
+        if (lead is not null)
+        {
+            usable.RemoveAll(i => i.Id == lead.Id);
+            lead = lead with { Id = $"{id}-lead" };
         }
 
         var usableIds = usable.Select(i => i.Id).ToHashSet();
@@ -79,6 +104,10 @@ public sealed class ArticlePreparationService(PageExtractor extractor, ImageProc
 
         return (article with { LeadImage = lead, LeadImageCandidates = [], BodyImages = usable, Blocks = blocks }, notes);
     }
+
+    private async Task<(ArticleImage Image, ArticleImage? Result)[]> ProcessAllAsync(
+        IEnumerable<ArticleImage> toProcess, ImageOptions imageOptions, CancellationToken cancellationToken) =>
+        await Task.WhenAll(toProcess.Select(async i => (i, await images.ProcessAsync(i, imageOptions, cancellationToken))));
 
     private static bool IsDiscussionPage(string url) =>
         Uri.TryCreate(url, UriKind.Absolute, out var uri)

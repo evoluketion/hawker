@@ -37,7 +37,7 @@ public static partial class ArticleBuilder
         var blocks = best.Body?.Blocks.ToList() ?? [];
         var bodyImages = best.Body?.Images.ToList() ?? [];
 
-        var leadCandidates = ChooseLeadCandidates(id, [item.ImageUrl, page?.FeaturedImage], baseUri, blocks, bodyImages);
+        var leadCandidates = ChooseLeadCandidates(id, item.ImageUrl, page?.FeaturedImage, baseUri, blocks, bodyImages);
 
         return new Article
         {
@@ -53,7 +53,7 @@ public static partial class ArticleBuilder
             CommentsUrl = item.CommentsUrl,
             Blocks = blocks,
             BodyImages = bodyImages,
-            LeadImage = leadCandidates.FirstOrDefault(),
+            LeadImage = leadCandidates.FirstOrDefault() is { } first ? first with { Id = $"{id}-lead" } : null,
             LeadImageCandidates = leadCandidates,
             BodySource = source,
         };
@@ -69,18 +69,21 @@ public static partial class ArticleBuilder
             .FirstOrDefault();
 
     /// <summary>
-    /// Lead candidates are the feed's image and the page's featured image; failing both, the first image in the body.
-    /// Any body image that duplicates a candidate is removed so it does not print twice.
+    /// Lead candidates in order of preference: the feed's image, the first picture in the body, then the page's
+    /// featured image. Featured (og:image) pictures are often social-share versions with the publisher's logo burned in,
+    /// so they come last. A body picture offered as a candidate keeps its body ID and stays in the body unless chosen;
+    /// any other body copy of a candidate is removed so it cannot print twice.
     /// </summary>
-    private static List<ArticleImage> ChooseLeadCandidates(string id, IEnumerable<string?> urls, Uri baseUri, List<ArticleBlock> blocks, List<ArticleImage> bodyImages)
+    private static List<ArticleImage> ChooseLeadCandidates(string id, string? feedImage, string? featuredImage, Uri baseUri, List<ArticleBlock> blocks, List<ArticleImage> bodyImages)
     {
         var candidates = new List<ArticleImage>();
-        foreach (var url in urls)
+
+        void AddExternal(string? url)
         {
             if (url is null || !Uri.TryCreate(baseUri, url, out var uri) || uri.Scheme is not ("http" or "https")
-                || candidates.Any(c => c.SourceUrl == uri.AbsoluteUri))
+                || candidates.Any(c => SameImage(c.SourceUrl, uri.AbsoluteUri)))
             {
-                continue;
+                return;
             }
 
             var duplicate = bodyImages.FirstOrDefault(i => SameImage(i.SourceUrl, uri.AbsoluteUri));
@@ -92,20 +95,20 @@ public static partial class ArticleBuilder
             candidates.Add(new ArticleImage { Id = $"{id}-lead", SourceUrl = uri.AbsoluteUri, Caption = duplicate?.Caption });
         }
 
-        if (candidates.Count > 0)
-        {
-            return candidates;
-        }
+        AddExternal(feedImage);
 
         var firstFigure = blocks.FirstOrDefault(b => b.Kind == BlockKind.Figure);
-        if (firstFigure is null)
+        if (firstFigure is not null)
         {
-            return [];
+            var bodyImage = bodyImages.First(i => i.Id == firstFigure.ImageId);
+            if (!candidates.Any(c => SameImage(c.SourceUrl, bodyImage.SourceUrl)))
+            {
+                candidates.Add(bodyImage);
+            }
         }
 
-        var image = bodyImages.First(i => i.Id == firstFigure.ImageId);
-        RemoveFromBody(image, blocks, bodyImages);
-        return [image with { Id = $"{id}-lead" }];
+        AddExternal(featuredImage);
+        return candidates;
     }
 
     private static void RemoveFromBody(ArticleImage image, List<ArticleBlock> blocks, List<ArticleImage> bodyImages)

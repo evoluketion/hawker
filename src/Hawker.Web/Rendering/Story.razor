@@ -1,0 +1,54 @@
+@using Hawker.Core.Articles
+@using Hawker.Core.Layout
+
+<article class="story story--@Model.Size.ToString().ToLowerInvariant()">
+    <h2 class="headline">@Model.Article.Title</h2>
+    <div class="meta">@Model.MetaLine</div>
+
+    @if (Model.Image?.DataUri is { } leadSrc)
+    {
+        <figure class="lead-image">
+            <img src="@leadSrc" alt="" />
+            @if (Model.Image.Caption is { } caption)
+            {
+                <figcaption>@caption</figcaption>
+            }
+        </figure>
+    }
+
+    <div class="body">
+        @foreach (var block in Model.Blocks)
+        {
+            if (block.Kind == BlockKind.Figure && block.Image?.DataUri is { } src)
+            {
+                <figure>
+                    <img src="@src" alt="" />
+                    @if (block.Image.Caption is { } caption)
+                    {
+                        <figcaption>@caption</figcaption>
+                    }
+                </figure>
+            }
+            else
+            {
+                @((MarkupString)block.Html)
+            }
+        }
+
+        @if (Model.QrSvg is { } qr)
+        {
+            <div class="continued">
+                @((MarkupString)qr)
+                <div>
+                    <strong>@(Model.Truncated ? "Continued online" : "Read online")</strong>
+                    <span class="url">@Model.ShortUrl</span>
+                </div>
+            </div>
+        }
+    </div>
+</article>
+
+@code {
+    [Parameter, EditorRequired]
+    public StoryView Model { get; set; } = default!;
+}

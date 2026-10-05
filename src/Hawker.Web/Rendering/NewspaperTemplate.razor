@@ -1,0 +1,80 @@
+@using System.Globalization
+@using Hawker.Core.Domain
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <title>@Model.EditionName — @Model.LocalTime.ToString("d MMMM yyyy", CultureInfo.InvariantCulture)</title>
+    <style>
+        @((MarkupString)$"@page {{ size: {(Model.PaperSize == PaperSize.Letter ? "Letter" : "A4")}; }}")
+        @((MarkupString)NewspaperAssets.Stylesheet)
+    </style>
+</head>
+<body>
+    <header class="masthead">
+        <div class="masthead-ears">
+            <div class="ear">Issue No. @Model.IssueNumber</div>
+            <h1 class="masthead-title">@Model.EditionName</h1>
+            <div class="ear ear--right">@Model.StoryCount @(Model.StoryCount == 1 ? "story" : "stories")</div>
+        </div>
+        <div class="dateline">
+            <span>@Model.LocalTime.ToString("dddd, d MMMM yyyy", CultureInfo.InvariantCulture)</span>
+            <span>@Model.LocalTime.ToString("HH:mm", CultureInfo.InvariantCulture) edition</span>
+        </div>
+        @if (Model.Sections.Count > 0)
+        {
+            <div class="inside">
+                <strong>Inside</strong>
+                @foreach (var (part, index) in Model.Sections.Select((s, i) => (s, i)))
+                {
+                    <span>@(index > 0 ? " · " : " ")@part.Name (@part.StoryCount)</span>
+                }
+            </div>
+        }
+    </header>
+
+    <Story Model="Model.Lead" />
+
+    @foreach (var part in Model.Sections)
+    {
+        <section class="section">
+            <h2 class="section-head">@part.Name</h2>
+
+            @foreach (var story in part.Majors)
+            {
+                <Story Model="story" />
+            }
+
+            @if (part.Minors.Count > 0)
+            {
+                <div class="minors">
+                    @foreach (var story in part.Minors)
+                    {
+                        <Story Model="story" />
+                    }
+                </div>
+            }
+
+            @if (part.Briefs.Count > 0)
+            {
+                <div class="briefs">
+                    <h3 class="briefs-title">In brief</h3>
+                    <div class="briefs-grid">
+                        @foreach (var story in part.Briefs)
+                        {
+                            <Story Model="story" />
+                        }
+                    </div>
+                </div>
+            }
+        </section>
+    }
+
+</body>
+</html>
+
+@code {
+    [Parameter, EditorRequired]
+    public NewspaperModel Model { get; set; } = default!;
+}

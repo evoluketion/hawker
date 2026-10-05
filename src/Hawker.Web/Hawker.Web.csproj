@@ -11,8 +11,18 @@
     </PackageReference>
     <PackageReference Include="Microsoft.Extensions.Hosting.Systemd" Version="10.0.12" />
     <PackageReference Include="Microsoft.Extensions.Hosting.WindowsServices" Version="10.0.12" />
+    <PackageReference Include="Microsoft.Playwright" Version="1.63.0" />
+    <PackageReference Include="QRCoder" Version="1.8.0" />
     <PackageReference Include="Serilog.AspNetCore" Version="10.0.0" />
     <PackageReference Include="Serilog.Sinks.File" Version="7.0.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Inlined into every newspaper so rendering needs no files or network. -->
+    <Content Remove="Rendering\newspaper.css" />
+    <EmbeddedResource Include="Rendering\newspaper.css" />
+    <EmbeddedResource Include="Rendering\Fonts\*.ttf" />
+    <None Include="Rendering\Fonts\OFL-*.txt" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
   </ItemGroup>
 
   <PropertyGroup>

@@ -107,15 +107,30 @@ public class ArticleBuilderTests
     }
 
     [Fact]
-    public void First_body_figure_becomes_the_lead_when_nothing_else_is_offered()
+    public void Lead_candidates_prefer_feed_then_body_picture_then_featured_image()
+    {
+        var content = $"""<p>{Words(20)}</p><figure><img src="https://cdn.example.com/body.jpg"><figcaption>Body.</figcaption></figure>""";
+        var page = new ExtractedPage(null, null, "https://cdn.example.com/og-branded.jpg", IsReadable: true);
+
+        var article = ArticleBuilder.Build("a1", Selected(Item(content: content, imageUrl: "https://cdn.example.com/feed.jpg")), page);
+
+        Assert.Equal(
+            ["https://cdn.example.com/feed.jpg", "https://cdn.example.com/body.jpg", "https://cdn.example.com/og-branded.jpg"],
+            article.LeadImageCandidates.Select(c => c.SourceUrl));
+        Assert.Equal("a1-lead", article.LeadImage!.Id);
+        // The body picture stays in the body until preparation decides it is the lead.
+        Assert.Contains(article.Blocks, b => b.Kind == BlockKind.Figure);
+    }
+
+    [Fact]
+    public void First_body_figure_is_offered_when_nothing_else_is()
     {
         var content = $"""<p>{Words(20)}</p><figure><img src="https://cdn.example.com/first.jpg"><figcaption>First.</figcaption></figure>""";
 
         var article = ArticleBuilder.Build("a1", Selected(Item(content: content)), null);
 
-        Assert.Equal("https://cdn.example.com/first.jpg", article.LeadImage!.SourceUrl);
-        Assert.Equal("First.", article.LeadImage.Caption);
-        Assert.Empty(article.BodyImages);
-        Assert.DoesNotContain(article.Blocks, b => b.Kind == BlockKind.Figure);
+        var candidate = Assert.Single(article.LeadImageCandidates);
+        Assert.Equal("https://cdn.example.com/first.jpg", candidate.SourceUrl);
+        Assert.Equal("First.", candidate.Caption);
     }
 }

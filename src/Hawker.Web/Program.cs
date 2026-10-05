@@ -3,8 +3,11 @@ using Hawker.Core;
 using Hawker.Core.Articles;
 using Hawker.Core.Data;
 using Hawker.Core.Feeds;
+using Hawker.Core.Layout;
 using Hawker.Core.Selection;
 using Hawker.Web.Components;
+using Hawker.Web.Editions;
+using Hawker.Web.Rendering;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Hosting.WindowsServices;
@@ -49,6 +52,11 @@ builder.Services.AddHttpClient<ImageProcessor>(http => ConfigureHttp(http, TimeS
 builder.Services.AddSingleton<SeenArticleStore>();
 builder.Services.AddTransient<StorySelectionService>();
 builder.Services.AddTransient<ArticlePreparationService>();
+builder.Services.AddSingleton<ILayoutEditor, DeterministicLayoutEditor>();
+builder.Services.Configure<PdfOptions>(builder.Configuration.GetSection("Hawker:Pdf"));
+builder.Services.AddSingleton<NewspaperRenderer>();
+builder.Services.AddSingleton<PdfRenderer>();
+builder.Services.AddTransient<EditionComposer>();
 
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();

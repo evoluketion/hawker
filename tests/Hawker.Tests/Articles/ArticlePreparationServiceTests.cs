@@ -119,6 +119,24 @@ public class ArticlePreparationServiceTests
         Assert.Empty(result.Articles[0].LeadImageCandidates);
     }
 
+    [Fact]
+    public async Task Unbranded_body_picture_beats_the_featured_image_and_leaves_the_body()
+    {
+        // The fixture page has a body figure (site-plan.jpg) and an og:image (bridge-lead.jpg, often logo-branded).
+        _http.Html("https://news.example.com/bridge", ArticlePage);
+        _http.Image("https://news.example.com/img/site-plan.jpg", 800, 600);
+        _http.Image("https://news.example.com/img/bridge-lead.jpg", 1600, 900);
+
+        var result = await CreateService().PrepareAsync([Selected("https://news.example.com/bridge")], Feeds(), new ImageOptions());
+
+        var article = Assert.Single(result.Articles);
+        Assert.Equal("https://news.example.com/img/site-plan.jpg", article.LeadImage!.SourceUrl);
+        Assert.Equal("a1-lead", article.LeadImage.Id);
+        Assert.Equal("An artist’s impression of the finished bridge. Image: City Council", article.LeadImage.Caption);
+        Assert.Empty(article.BodyImages);
+        Assert.DoesNotContain(article.Blocks, b => b.Kind == BlockKind.Figure);
+    }
+
     private sealed class StubHandler : HttpMessageHandler
     {
         private readonly Dictionary<string, Func<HttpResponseMessage>> _responses = [];
