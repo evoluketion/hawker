@@ -26,7 +26,7 @@ public sealed class HawkerDbContextTests : IDisposable
         using var db = CreateContext();
 
         var settings = Assert.Single(db.AppSettings);
-        Assert.Equal("claude-sonnet-5-5", settings.ClaudeModel);
+        Assert.Equal("claude-opus-5-5", settings.ClaudeModel);
     }
 
     [Fact]

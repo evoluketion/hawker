@@ -21,6 +21,8 @@ public sealed class DeterministicLayoutEditor : ILayoutEditor
     private const int BriefWordThreshold = 60;
     private const int SubstantialWordCount = 150;
 
+    public string Name => "standard layout";
+
     public Task<LayoutPlan> PlanAsync(LayoutRequest request, CancellationToken cancellationToken = default) =>
         Task.FromResult(Plan(request.Articles));
 

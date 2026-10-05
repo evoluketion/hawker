@@ -6,7 +6,7 @@ public class AppSettings
     public const int SingletonId = 1;
 
     public int Id { get; set; } = SingletonId;
-    public string ClaudeModel { get; set; } = "claude-sonnet-5-5";
+    public string ClaudeModel { get; set; } = "claude-opus-5-5";
 
     /// <summary>Encrypted with ASP.NET Data Protection. The ANTHROPIC_API_KEY environment variable takes precedence.</summary>
     public string? EncryptedApiKey { get; set; }

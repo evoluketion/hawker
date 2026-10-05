@@ -55,7 +55,7 @@ namespace Hawker.Core.Data.Migrations
                         new
                         {
                             Id = 1,
-                            ClaudeModel = "claude-sonnet-5-5",
+                            ClaudeModel = "claude-opus-5-5",
                             MissedRunGraceMinutes = 120
                         });
                 });

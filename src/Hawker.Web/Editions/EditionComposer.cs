@@ -3,6 +3,7 @@ using Hawker.Core.Domain;
 using Hawker.Core.Layout;
 using Hawker.Core.Selection;
 using Hawker.Web.Rendering;
+using Hawker.Web.Settings;
 
 namespace Hawker.Web.Editions;
 
@@ -22,7 +23,7 @@ public sealed class NoArticlesException(string message, IReadOnlyList<string> lo
 public sealed class EditionComposer(
     StorySelectionService selection,
     ArticlePreparationService preparation,
-    ILayoutEditor layoutEditor,
+    LayoutEditorResolver layoutEditors,
     NewspaperRenderer htmlRenderer,
     PdfRenderer pdfRenderer,
     TimeProvider time,
@@ -58,15 +59,17 @@ public sealed class EditionComposer(
 
     private async Task<LayoutPlan> PlanAsync(Edition edition, IReadOnlyList<Article> articles, List<string> log, CancellationToken cancellationToken)
     {
+        var layoutEditor = await layoutEditors.ResolveAsync(cancellationToken);
         LayoutPlan proposed;
         try
         {
             proposed = await layoutEditor.PlanAsync(new LayoutRequest(edition.Name, articles), cancellationToken);
+            log.Add($"Laid out by {layoutEditor.Name}.");
         }
-        catch (Exception ex) when (ex is not OperationCanceledException && layoutEditor is not DeterministicLayoutEditor)
+        catch (Exception ex) when (!cancellationToken.IsCancellationRequested && layoutEditor is not DeterministicLayoutEditor)
         {
-            logger.LogWarning(ex, "Layout editor failed; using the standard layout.");
-            log.Add($"The layout editor failed ({ex.Message}); the standard layout was used.");
+            logger.LogWarning(ex, "{Editor} failed; using the standard layout.", layoutEditor.Name);
+            log.Add($"{layoutEditor.Name} could not lay out the edition ({ex.Message}); the standard layout was used.");
             proposed = DeterministicLayoutEditor.Plan(articles);
         }
 
