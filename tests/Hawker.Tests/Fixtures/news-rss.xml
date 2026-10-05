@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE rss PUBLIC "-//Netscape Communications//DTD RSS 0.91//EN" "http://my.netscape.com/publish/formats/rss-0.91.dtd">
+<rss version="2.0"
+     xmlns:content="http://purl.org/rss/1.0/modules/content/"
+     xmlns:media="http://search.yahoo.com/mrss/"
+     xmlns:dc="http://purl.org/dc/elements/1.1/">
+  <channel>
+    <title>Example News</title>
+    <link>https://news.example.com/</link>
+    <item>
+      <title>Council approves new bridge</title>
+      <link>https://news.example.com/local/bridge?utm_source=rss</link>
+      <description><![CDATA[<p>The council voted 7–2 in favour.</p>]]></description>
+      <content:encoded><![CDATA[<p>The council voted 7–2 in favour.</p><p>Work starts in spring.</p>]]></content:encoded>
+      <pubDate>Mon, 05 Oct 2026 09:30:00 GMT</pubDate>
+      <dc:creator>Jo Reporter</dc:creator>
+      <media:content url="https://cdn.example.com/bridge.jpg" medium="image" width="1200" />
+      <media:content url="https://cdn.example.com/bridge-video.mp4" medium="video" width="1920" />
+    </item>
+    <item>
+      <title>Weather turns cold</title>
+      <link>/weather/cold</link>
+      <description>Frost expected overnight.</description>
+      <media:content width="140" url="https://cdn.example.com/frost-140.jpg" />
+      <media:content width="460" url="https://cdn.example.com/frost-460.jpg" />
+      <pubDate>5 Oct 2026 07:00:00 EDT</pubDate>
+      <enclosure url="https://cdn.example.com/frost.png" type="image/png" length="1234" />
+    </item>
+    <item>
+      <title>Thumbnail only story</title>
+      <guid isPermaLink="true">https://news.example.com/thumb</guid>
+      <pubDate>Sun, 4 Oct 2026 22:15 +0100</pubDate>
+      <media:group>
+        <media:thumbnail url="https://cdn.example.com/thumb.jpg" />
+      </media:group>
+    </item>
+    <item>
+      <title>Item with no link is skipped</title>
+      <guid isPermaLink="false">abc-123</guid>
+    </item>
+    <item>
+      <title>Undated story</title>
+      <link>https://news.example.com/undated</link>
+      <pubDate>sometime soon</pubDate>
+    </item>
+  </channel>
+</rss>

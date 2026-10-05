@@ -1,5 +1,8 @@
+using System.Net;
 using Hawker.Core;
 using Hawker.Core.Data;
+using Hawker.Core.Feeds;
+using Hawker.Core.Selection;
 using Hawker.Web.Components;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.EntityFrameworkCore;
@@ -34,6 +37,16 @@ if (OperatingSystem.IsWindows())
 {
     dataProtection.ProtectKeysWithDpapi(protectToLocalMachine: true);
 }
+
+builder.Services.AddSingleton(TimeProvider.System);
+builder.Services.AddHttpClient<FeedFetcher>(http =>
+    {
+        http.Timeout = TimeSpan.FromSeconds(30);
+        http.DefaultRequestHeaders.UserAgent.ParseAdd("Hawker/1.0 (+personal newspaper)");
+    })
+    .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { AutomaticDecompression = DecompressionMethods.All });
+builder.Services.AddSingleton<SeenArticleStore>();
+builder.Services.AddTransient<StorySelectionService>();
 
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();

@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+  <title>Example Blog</title>
+  <link href="https://blog.example.org/"/>
+  <updated>2026-10-05T08:00:00Z</updated>
+  <entry>
+    <title type="html">Writing &lt;em&gt;fast&lt;/em&gt; parsers &amp;amp; more</title>
+    <link rel="alternate" type="text/html" href="https://blog.example.org/posts/parsers"/>
+    <link rel="replies" type="text/html" href="https://blog.example.org/posts/parsers#comments"/>
+    <link rel="enclosure" type="image/jpeg" href="https://blog.example.org/img/parsers.jpg"/>
+    <id>tag:blog.example.org,2026:parsers</id>
+    <published>2026-10-04T18:45:00+02:00</published>
+    <updated>2026-10-05T08:00:00Z</updated>
+    <author><name>Sam Author</name></author>
+    <summary>A short summary.</summary>
+    <content type="xhtml"><div xmlns="http://www.w3.org/1999/xhtml"><p>Full <strong>body</strong>.</p></div></content>
+  </entry>
+  <entry>
+    <title>Updated only</title>
+    <link href="posts/updated"/>
+    <id>tag:blog.example.org,2026:updated</id>
+    <updated>2026-10-03T12:00:00Z</updated>
+  </entry>
+</feed>
