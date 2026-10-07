@@ -14,8 +14,13 @@ public sealed record PrintOptions(string? PrinterName, int Copies, bool Duplex, 
 /// <param name="JobId">The print system's job reference, when it reports one.</param>
 public sealed record PrintResult(string Printer, string? JobId);
 
-public sealed class PrintException(string message, Exception? inner = null) : Exception(message, inner)
+/// <param name="mayHavePrinted">
+/// True when the job might have reached the printer despite the error (a timeout). Such failures are never retried.
+/// </param>
+public sealed class PrintException(string message, Exception? inner = null, bool mayHavePrinted = false) : Exception(message, inner)
 {
+    public bool MayHavePrinted { get; } = mayHavePrinted;
+
     /// <summary>
     /// A command that hangs may already have handed the job to the printer, and Hawker never retries prints, so the
     /// message tells the reader to check before reprinting.
@@ -31,4 +36,10 @@ public interface IPrintService
 
     /// <exception cref="PrintException">The printer or print system rejected the job.</exception>
     Task<PrintResult> PrintAsync(string pdfPath, PrintOptions options, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Looks at the print queue after a job was accepted. Returns a description of a problem (job still waiting, printer
+    /// stopped) or null if the job has gone through or the print system cannot tell. Never changes or resubmits the job.
+    /// </summary>
+    Task<string?> CheckJobAsync(PrintResult job, CancellationToken cancellationToken = default);
 }

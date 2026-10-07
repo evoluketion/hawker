@@ -47,6 +47,12 @@ namespace Hawker.Core.Data.Migrations
                     b.Property<int>("MissedRunGraceMinutes")
                         .HasColumnType("INTEGER");
 
+                    b.Property<int>("PrintRetryCount")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("PrintRetryDelaySeconds")
+                        .HasColumnType("INTEGER");
+
                     b.HasKey("Id");
 
                     b.ToTable("AppSettings");
@@ -56,7 +62,9 @@ namespace Hawker.Core.Data.Migrations
                         {
                             Id = 1,
                             ClaudeModel = "claude-opus-5-5",
-                            MissedRunGraceMinutes = 120
+                            MissedRunGraceMinutes = 120,
+                            PrintRetryCount = 0,
+                            PrintRetryDelaySeconds = 60
                         });
                 });
 
@@ -128,6 +136,9 @@ namespace Hawker.Core.Data.Migrations
                     b.Property<int>("EditionId")
                         .HasColumnType("INTEGER");
 
+                    b.Property<string>("Error")
+                        .HasColumnType("TEXT");
+
                     b.Property<long?>("FinishedAt")
                         .HasColumnType("INTEGER");
 
@@ -142,6 +153,12 @@ namespace Hawker.Core.Data.Migrations
                         .HasColumnType("TEXT");
 
                     b.Property<bool>("Printed")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<long?>("PrintedAt")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<long?>("ScheduledFor")
                         .HasColumnType("INTEGER");
 
                     b.Property<long>("StartedAt")

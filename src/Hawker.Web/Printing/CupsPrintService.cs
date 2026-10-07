@@ -26,12 +26,37 @@ public sealed partial class CupsPrintService(IProcessRunner runner, ILogger<Cups
         var result = await RunAsync("lp", arguments, cancellationToken);
         if (result.ExitCode != 0)
         {
-            throw new PrintException($"Printing failed: {FirstLine(result.StandardError) ?? $"lp exited with code {result.ExitCode}"}");
+            throw new PrintException($"The print system refused the job ({FirstLine(result.StandardError) ?? $"lp exited with code {result.ExitCode}"}).");
         }
 
         var jobId = JobId().Match(result.StandardOutput) is { Success: true } job ? job.Groups[1].Value : null;
         logger.LogInformation("Sent {Pdf} to {Printer} as job {Job}", pdfPath, options.PrinterName ?? "default printer", jobId);
         return new PrintResult(options.PrinterName ?? "default printer", jobId);
+    }
+
+    public async Task<string?> CheckJobAsync(PrintResult job, CancellationToken cancellationToken = default)
+    {
+        if (job.JobId is null)
+        {
+            return null;
+        }
+
+        // "lpstat -o" lists jobs that have not completed; a job still there after a few minutes is stuck.
+        var queue = await RunAsync("lpstat", ["-o"], cancellationToken);
+        var stillQueued = queue.StandardOutput
+            .Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Any(line => line.StartsWith(job.JobId + " ", StringComparison.Ordinal) || line == job.JobId);
+        if (!stillQueued)
+        {
+            return null;
+        }
+
+        // CUPS job IDs are "<printer>-<number>".
+        var dash = job.JobId.LastIndexOf('-');
+        var printer = dash > 0 ? job.JobId[..dash] : job.JobId;
+        var state = await RunAsync("lpstat", ["-p", printer], cancellationToken);
+        var detail = string.Join(" ", state.StandardOutput.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries));
+        return $"Job {job.JobId} is still waiting in the print queue. Printer status: {(detail.Length > 0 ? detail : "unknown")}";
     }
 
     public static IReadOnlyList<string> BuildArguments(string pdfPath, PrintOptions options)
@@ -66,7 +91,7 @@ public sealed partial class CupsPrintService(IProcessRunner runner, ILogger<Cups
         }
         catch (TimeoutException ex)
         {
-            throw new PrintException(PrintException.TimedOutMessage, ex);
+            throw new PrintException(PrintException.TimedOutMessage, ex, mayHavePrinted: true);
         }
     }
 

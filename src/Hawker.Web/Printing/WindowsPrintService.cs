@@ -15,11 +15,11 @@ public sealed class PrintingOptions
 /// Prints on Windows with SumatraPDF's command line, which prints a PDF silently (no dialog, no viewer window) with
 /// copies, duplex and paper size, and works from a Windows service.
 /// </summary>
-[SupportedOSPlatform("windows")]
 public sealed class WindowsPrintService(IProcessRunner runner, IOptions<PrintingOptions> options, ILogger<WindowsPrintService> logger) : IPrintService
 {
     private static readonly TimeSpan PrintTimeout = TimeSpan.FromMinutes(3);
 
+    [SupportedOSPlatform("windows")]
     public Task<IReadOnlyList<PrinterInfo>> ListPrintersAsync(CancellationToken cancellationToken = default)
     {
         var defaultName = new PrinterSettings().PrinterName;
@@ -30,6 +30,7 @@ public sealed class WindowsPrintService(IProcessRunner runner, IOptions<Printing
         return Task.FromResult(printers);
     }
 
+    [SupportedOSPlatform("windows")]
     public async Task<PrintResult> PrintAsync(string pdfPath, PrintOptions printOptions, CancellationToken cancellationToken = default)
     {
         var sumatra = FindSumatra(options.Value.SumatraPath)
@@ -46,7 +47,7 @@ public sealed class WindowsPrintService(IProcessRunner runner, IOptions<Printing
         }
         catch (TimeoutException ex)
         {
-            throw new PrintException(PrintException.TimedOutMessage, ex);
+            throw new PrintException(PrintException.TimedOutMessage, ex, mayHavePrinted: true);
         }
 
         if (result.ExitCode != 0)
@@ -59,6 +60,9 @@ public sealed class WindowsPrintService(IProcessRunner runner, IOptions<Printing
         logger.LogInformation("Sent {Pdf} to {Printer}", pdfPath, printer);
         return new PrintResult(printer, null);
     }
+
+    // SumatraPDF hands the job to the Windows spooler and exits; it reports no job ID to follow up on.
+    public Task<string?> CheckJobAsync(PrintResult job, CancellationToken cancellationToken = default) => Task.FromResult<string?>(null);
 
     public static IReadOnlyList<string> BuildArguments(string pdfPath, PrintOptions options)
     {

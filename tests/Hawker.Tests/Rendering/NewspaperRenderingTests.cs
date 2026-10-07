@@ -2,6 +2,8 @@ using Hawker.Core.Articles;
 using Hawker.Core.Domain;
 using Hawker.Core.Layout;
 using Hawker.Web.Rendering;
+using Microsoft.AspNetCore.Builder;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -19,8 +21,12 @@ public class NewspaperRenderingTests
 
     private static async Task<string> RenderAsync(NewspaperModel model)
     {
-        var services = new ServiceCollection().AddLogging().BuildServiceProvider();
-        return await new NewspaperRenderer(services, services.GetRequiredService<ILoggerFactory>()).RenderHtmlAsync(model);
+        // A real web host container with the app's component registrations, so renderer scoping problems show up here.
+        var builder = WebApplication.CreateBuilder();
+        builder.Host.UseDefaultServiceProvider(o => o.ValidateScopes = true);
+        builder.Services.AddRazorComponents();
+        var services = builder.Build().Services;
+        return await new NewspaperRenderer(services.GetRequiredService<IServiceScopeFactory>(), services.GetRequiredService<ILoggerFactory>()).RenderHtmlAsync(model);
     }
 
     [Fact]

@@ -483,3 +483,6 @@ $RECYCLE.BIN/
 
 # Hawker local data
 data/
+
+# Test output (including hang dumps)
+TestResults/

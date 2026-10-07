@@ -19,6 +19,13 @@ public sealed class NoArticlesException(string message, IReadOnlyList<string> lo
     public IReadOnlyList<string> Log { get; } = log;
 }
 
+public interface IEditionComposer
+{
+    /// <param name="edition">Must have its Feeds loaded.</param>
+    /// <exception cref="NoArticlesException">Nothing was available to print.</exception>
+    Task<ComposedEdition> ComposeAsync(Edition edition, int issueNumber, CancellationToken cancellationToken = default);
+}
+
 /// <summary>Builds one issue of an edition: choose articles, prepare them, lay them out, render HTML and PDF.</summary>
 public sealed class EditionComposer(
     StorySelectionService selection,
@@ -27,9 +34,8 @@ public sealed class EditionComposer(
     NewspaperRenderer htmlRenderer,
     PdfRenderer pdfRenderer,
     TimeProvider time,
-    ILogger<EditionComposer> logger)
+    ILogger<EditionComposer> logger) : IEditionComposer
 {
-    /// <param name="edition">Must have its Feeds loaded.</param>
     public async Task<ComposedEdition> ComposeAsync(Edition edition, int issueNumber, CancellationToken cancellationToken = default)
     {
         var log = new List<string>();

@@ -58,7 +58,11 @@ builder.Services.AddSingleton<LayoutEditorResolver>();
 builder.Services.Configure<PdfOptions>(builder.Configuration.GetSection("Hawker:Pdf"));
 builder.Services.AddSingleton<NewspaperRenderer>();
 builder.Services.AddSingleton<PdfRenderer>();
-builder.Services.AddTransient<EditionComposer>();
+builder.Services.AddTransient<IEditionComposer, EditionComposer>();
+builder.Services.AddSingleton<EditionRunQueue>();
+builder.Services.AddTransient<EditionRunService>();
+builder.Services.AddHostedService<EditionRunWorker>();
+builder.Services.AddHostedService<EditionScheduler>();
 builder.Services.Configure<PrintingOptions>(builder.Configuration.GetSection("Hawker:Printing"));
 builder.Services.AddSingleton<IProcessRunner, ProcessRunner>();
 if (OperatingSystem.IsWindows())
