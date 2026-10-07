@@ -1,0 +1,94 @@
+@page "/archive"
+@implements IDisposable
+@inject RunHistory History
+@inject EditionStore Editions
+@inject RunEvents Events
+
+<PageTitle>Archive · Hawker</PageTitle>
+
+<div class="page-head">
+    <div>
+        <h1>Archive</h1>
+        <p>Every paper Hawker has built, newest first. Open one to read it, download it or print it again.</p>
+    </div>
+    @if (_editions is { Count: > 1 })
+    {
+        <div class="field" style="margin:0;min-width:220px">
+            <label for="edition-filter">Edition</label>
+            <select id="edition-filter" @bind="EditionFilter" @bind:after="LoadAsync">
+                <option value="0">All editions</option>
+                @foreach (var e in _editions)
+                {
+                    <option value="@e.Id">@e.Name</option>
+                }
+            </select>
+        </div>
+    }
+</div>
+
+<div class="card">
+    @if (_runs is null)
+    {
+        <p class="muted" style="margin:0">Loading…</p>
+    }
+    else if (_runs.Count == 0)
+    {
+        <p class="muted" style="margin:0">Nothing here yet.</p>
+    }
+    else
+    {
+        <div class="table-wrap">
+            <table class="table">
+                <thead><tr><th>Edition</th><th>Issue</th><th>Built</th><th>How</th><th>Result</th><th></th></tr></thead>
+                <tbody>
+                    @foreach (var run in _runs)
+                    {
+                        <tr>
+                            <td>@run.Edition?.Name</td>
+                            <td>@(run.IssueNumber > 0 ? $"No. {run.IssueNumber}" : "—")</td>
+                            <td><LocalTime Value="run.StartedAt" /></td>
+                            <td class="muted">@RunHistory.DescribeTrigger(run.Trigger)</td>
+                            <td><RunStatusBadge Run="run" /></td>
+                            <td class="actions">
+                                @if (run.PdfPath is not null)
+                                {
+                                    <a class="btn btn-sm" href="runs/@run.Id/pdf" target="_blank" rel="noopener">PDF</a>
+                                }
+                                <a class="btn btn-sm" href="runs/@run.Id">Details</a>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+        @if (_runs.Count == PageSize)
+        {
+            <p class="muted small">Showing the latest @PageSize runs.</p>
+        }
+    }
+</div>
+
+@code {
+    private const int PageSize = 100;
+    private IReadOnlyList<EditionSummary>? _editions;
+    private IReadOnlyList<EditionRun>? _runs;
+
+    private int EditionFilter { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        Events.RunChanged += OnRunChanged;
+        _editions = await Editions.ListAsync();
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync() => _runs = await History.RecentAsync(PageSize, EditionFilter == 0 ? null : EditionFilter);
+
+    private void OnRunChanged(int id) => InvokeAsync(async () =>
+    {
+        await LoadAsync();
+        StateHasChanged();
+    });
+
+    public void Dispose() => Events.RunChanged -= OnRunChanged;
+}

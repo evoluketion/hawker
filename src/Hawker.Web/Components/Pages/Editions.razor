@@ -1,0 +1,55 @@
+@page "/editions"
+@inject EditionStore Store
+
+<PageTitle>Editions · Hawker</PageTitle>
+
+<div class="page-head">
+    <div>
+        <h1>Editions</h1>
+        <p>Each edition is a newspaper: its feeds, how many stories, how far back to look, when it prints and where.</p>
+    </div>
+    <a class="btn btn-primary" href="editions/new">New edition</a>
+</div>
+
+<div class="card">
+    @if (_editions is null)
+    {
+        <p class="muted" style="margin:0">Loading…</p>
+    }
+    else if (_editions.Count == 0)
+    {
+        <p style="margin:0">No editions yet. <a href="editions/new">Create one</a>.</p>
+    }
+    else
+    {
+        <div class="table-wrap">
+            <table class="table">
+                <thead><tr><th>Edition</th><th>Schedule</th><th>Next paper</th><th>Feeds</th><th></th></tr></thead>
+                <tbody>
+                    @foreach (var e in _editions)
+                    {
+                        <tr>
+                            <td>
+                                <strong>@e.Name</strong>
+                                @if (!e.Enabled)
+                                {
+                                    <span class="badge badge-plain">Paused</span>
+                                }
+                            </td>
+                            <td class="small">@(e.Schedules.Count == 0 ? "By hand only" : string.Join("; ", e.Schedules))</td>
+                            <td><LocalTime Value="e.NextRun" Zone="e.Zone" /></td>
+                            <td>@e.FeedCount</td>
+                            <td class="actions"><a class="btn btn-sm" href="editions/@e.Id">Edit</a></td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+</div>
+
+@code {
+    private IReadOnlyList<EditionSummary>? _editions;
+
+    protected override async Task OnInitializedAsync() => _editions = await Store.ListAsync();
+}

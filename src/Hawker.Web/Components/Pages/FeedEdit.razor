@@ -1,0 +1,191 @@
+@page "/feeds/new"
+@page "/feeds/{FeedId:int}"
+@inject FeedStore Store
+@inject NavigationManager Nav
+
+<PageTitle>@(IsNew ? "Add feed" : _feed.Name) · Hawker</PageTitle>
+
+<div class="page-head">
+    <div>
+        <h1>@(IsNew ? "Add feed" : "Edit feed")</h1>
+        <p><a href="feeds">← All feeds</a></p>
+    </div>
+</div>
+
+<ErrorList Errors="_errors" />
+
+<div class="grid grid-2">
+    <div class="card">
+        <div class="field">
+            <label for="name">Name</label>
+            <input id="name" type="text" @bind="_feed.Name" placeholder="BBC News" />
+            <span class="hint">Printed as the source of each story, and used as a section name.</span>
+        </div>
+        <div class="field">
+            <label for="url">Feed address</label>
+            <input id="url" type="url" @bind="_feed.Url" placeholder="https://feeds.bbci.co.uk/news/rss.xml" />
+        </div>
+        <label class="check"><input type="checkbox" @bind="_feed.Enabled" /> <span>Use this feed</span></label>
+        <label class="check"><input type="checkbox" @bind="_feed.FetchFullText" />
+            <span>Fetch the full article from its web page<br /><span class="hint">Recommended. Off uses only the text inside the feed, which is often just a summary.</span></span></label>
+        <label class="check"><input type="checkbox" @bind="_feed.SkipLiveBlogs" />
+            <span>Skip live blogs<br /><span class="hint">Rolling "– live" update pages print as long runs of timestamped fragments.</span></span></label>
+        <div class="field">
+            <label for="cap">Most stories per edition</label>
+            <input id="cap" type="number" min="1" @bind="_feed.MaxItemsPerRun" placeholder="No limit" />
+            <span class="hint">Stops one busy feed filling the whole paper. Leave empty for no limit.</span>
+        </div>
+
+        <h3>Popularity scores</h3>
+        <div class="field">
+            <label for="score-source">Where scores come from</label>
+            <select id="score-source" @bind="_feed.ScoreSource">
+                <option value="@ScoreSource.Auto">Detect automatically (Hacker News via hnrss.org)</option>
+                <option value="@ScoreSource.Hnrss">Hacker News points (hnrss.org)</option>
+                <option value="@ScoreSource.Regex">Custom pattern</option>
+                <option value="@ScoreSource.None">No scores</option>
+            </select>
+            <span class="hint">Used when an edition ranks by "most popular". Currently: <strong>@EffectiveSource</strong>.</span>
+        </div>
+        @if (_feed.ScoreSource == ScoreSource.Regex)
+        {
+            <div class="field">
+                <label for="regex">Score pattern</label>
+                <input id="regex" type="text" class="mono" @bind="_feed.ScoreRegex" placeholder="(?<score>[\d,]+) votes" />
+                <span class="hint">A regular expression with a group named <span class="mono">score</span> (and optionally <span class="mono">comments</span>), matched against each item's title and description.</span>
+            </div>
+        }
+        @if (EffectiveSource != "none")
+        {
+            <div class="field">
+                <label for="min-score">Minimum score</label>
+                <input id="min-score" type="number" min="0" @bind="_feed.MinScore" placeholder="None" />
+                <span class="hint">Leave out stories below this score.
+                    @if (_feed.Url?.Contains("hnrss.org", StringComparison.OrdinalIgnoreCase) == true)
+                    {
+                        <text>hnrss can also filter at the source: add <span class="mono">?points=100</span> to the address.</text>
+                    }
+                </span>
+            </div>
+        }
+
+        <div class="form-actions">
+            <button class="btn btn-primary" @onclick="SaveAsync" disabled="@_busy">Save</button>
+            <button class="btn" @onclick="TestAsync" disabled="@_busy">@(_testing ? "Testing…" : "Test feed")</button>
+            <span class="spacer"></span>
+            @if (!IsNew)
+            {
+                <button class="btn btn-danger" @onclick="() => _confirmDelete = true">Delete</button>
+            }
+        </div>
+    </div>
+
+    <div class="card">
+        <h2>What Hawker sees</h2>
+        @if (_test is null)
+        {
+            <p class="muted">Press <strong>Test feed</strong> to fetch it now and see the stories, dates and scores Hawker reads. Nothing is saved or printed.</p>
+        }
+        else if (_test.Error is { } error)
+        {
+            <div class="alert alert-bad">@error</div>
+        }
+        else
+        {
+            <p class="small muted">@_test.Items.Count stories · @_test.Items.Count(i => i.Score is not null) with scores · @_test.Items.Count(i => i.ImageUrl is not null) with pictures in the feed</p>
+            <ul class="items">
+                @foreach (var item in _test.Items.Take(25))
+                {
+                    <li>
+                        <div><a href="@item.Url" target="_blank" rel="noopener">@item.Title</a></div>
+                        <div class="small muted row">
+                            <LocalTime Value="item.Published" Empty="No date" />
+                            @if (item.Score is { } score)
+                            {
+                                <span>· @score.ToString("N0", CultureInfo.InvariantCulture) points</span>
+                            }
+                            @if (item.CommentCount is { } comments)
+                            {
+                                <span>· @comments.ToString("N0", CultureInfo.InvariantCulture) comments</span>
+                            }
+                            @if (item.ImageUrl is not null)
+                            {
+                                <span>· picture</span>
+                            }
+                            @if (_feed.SkipLiveBlogs && Hawker.Core.Feeds.LiveBlogDetector.IsLiveBlog(item))
+                            {
+                                <span class="badge badge-warn">Skipped: live blog</span>
+                            }
+                            @if (_feed.MinScore is { } min && item.Score < min)
+                            {
+                                <span class="badge badge-warn">Skipped: below minimum score</span>
+                            }
+                        </div>
+                    </li>
+                }
+            </ul>
+        }
+    </div>
+</div>
+
+<ConfirmDialog Visible="_confirmDelete" Title="Delete this feed?" ConfirmText="Delete" Danger="true"
+               OnConfirm="DeleteAsync" OnCancel="() => _confirmDelete = false">
+    <p>Editions using <strong>@_feed.Name</strong> will stop receiving its stories. Past papers in the archive are kept.</p>
+</ConfirmDialog>
+
+@code {
+    [Parameter] public int? FeedId { get; set; }
+
+    private Feed _feed = new() { Name = "", Url = "" };
+    private IReadOnlyList<string>? _errors;
+    private FeedTestResult? _test;
+    private bool _busy, _testing, _confirmDelete;
+
+    private bool IsNew => FeedId is null;
+
+    private string EffectiveSource => Hawker.Core.Feeds.PopularityExtractor.ResolveSource(_feed) switch
+    {
+        ScoreSource.Hnrss => "Hacker News points",
+        ScoreSource.Regex => "custom pattern",
+        _ => "none",
+    };
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (FeedId is { } id)
+        {
+            _feed = await Store.LoadAsync(id) ?? new Feed { Name = "", Url = "" };
+        }
+    }
+
+    private async Task SaveAsync()
+    {
+        _busy = true;
+        var result = await Store.SaveAsync(_feed);
+        _busy = false;
+        _errors = result.Errors;
+        if (result.Succeeded)
+        {
+            Nav.NavigateTo("feeds");
+        }
+    }
+
+    private async Task TestAsync()
+    {
+        _busy = _testing = true;
+        try
+        {
+            _test = await Store.TestAsync(_feed);
+        }
+        finally
+        {
+            _busy = _testing = false;
+        }
+    }
+
+    private async Task DeleteAsync()
+    {
+        await Store.DeleteAsync(_feed.Id);
+        Nav.NavigateTo("feeds");
+    }
+}

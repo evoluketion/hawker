@@ -1,7 +1,188 @@
 @page "/"
+@implements IDisposable
+@inject EditionStore Editions
+@inject FeedStore Feeds
+@inject RunHistory History
+@inject EditionRunQueue Queue
+@inject RunEvents Events
+@inject ClaudeSettingsService Claude
 
-<PageTitle>Hawker</PageTitle>
+<PageTitle>Dashboard · Hawker</PageTitle>
 
-<h1>Hawker</h1>
+<div class="page-head">
+    <div>
+        <h1>Dashboard</h1>
+        <p>@Greeting</p>
+    </div>
+</div>
 
-<p>Your personalised printed newspaper. The dashboard arrives in a later stage.</p>
+@if (_message is not null)
+{
+    <div class="alert alert-info">@_message</div>
+}
+
+@if (_editions is null)
+{
+    <p class="muted">Loading…</p>
+}
+else if (_editions.Count == 0)
+{
+    <div class="card">
+        <h2>Getting started</h2>
+        <ol class="stack">
+            <li><a href="feeds/new">Add a feed</a> or two: any RSS or Atom address. @(_feedCount > 0 ? $"(You have {_feedCount}.)" : "")</li>
+            <li><a href="editions/new">Create an edition</a>: pick feeds, how many articles, how far back to look, and when it prints.</li>
+            <li>Check <a href="settings">Settings</a>: choose a printer and, optionally, add a Claude API key for smarter layouts.</li>
+        </ol>
+    </div>
+}
+else
+{
+    <div class="grid grid-2">
+        @foreach (var edition in _editions)
+        {
+            <div class="card">
+                <div class="row">
+                    <h2 style="margin:0">@edition.Name</h2>
+                    @if (!edition.Enabled)
+                    {
+                        <span class="badge badge-plain">Paused</span>
+                    }
+                    <span class="spacer"></span>
+                    <a class="btn btn-sm" href="editions/@edition.Id">Edit</a>
+                </div>
+                <div class="muted small" style="margin:.35rem 0 .8rem">
+                    @(edition.Schedules.Count == 0 ? "No schedule: runs only when started by hand." : string.Join(" · ", edition.Schedules))
+                </div>
+                <div class="small muted">Next paper</div>
+                <div class="next-run">
+                    @if (edition.NextRun is { } next)
+                    {
+                        <LocalTime Value="next" Zone="edition.Zone" />
+                        <span class="muted small">(@Until(next))</span>
+                    }
+                    else
+                    {
+                        <span class="muted">@(edition.Enabled ? "Not scheduled" : "Paused")</span>
+                    }
+                </div>
+                @if (edition.LastRun is { } last)
+                {
+                    <div class="row small" style="margin-top:.6rem">
+                        <span class="muted">Last:</span>
+                        <LocalTime Value="last.StartedAt" Zone="edition.Zone" />
+                        <RunStatusBadge Run="last" />
+                        <a href="runs/@last.Id">Details</a>
+                    </div>
+                }
+                <div class="form-actions">
+                    <button class="btn btn-primary" @onclick="() => _confirmRun = edition">Print now</button>
+                    <button class="btn" @onclick="() => Preview(edition)">Preview</button>
+                </div>
+            </div>
+        }
+    </div>
+
+    <h2>Recent runs</h2>
+    <div class="card">
+        @if (_runs is { Count: > 0 })
+        {
+            <div class="table-wrap">
+                <table class="table">
+                    <thead><tr><th>Edition</th><th>Started</th><th>How</th><th>Issue</th><th>Result</th><th></th></tr></thead>
+                    <tbody>
+                        @foreach (var run in _runs)
+                        {
+                            <tr>
+                                <td>@run.Edition?.Name</td>
+                                <td><LocalTime Value="run.StartedAt" /></td>
+                                <td class="muted">@RunHistory.DescribeTrigger(run.Trigger)</td>
+                                <td>@(run.IssueNumber > 0 ? $"No. {run.IssueNumber}" : "—")</td>
+                                <td><RunStatusBadge Run="run" /></td>
+                                <td class="actions"><a href="runs/@run.Id">Details</a></td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+        else
+        {
+            <p class="muted" style="margin:0">No runs yet. Press <strong>Preview</strong> on an edition to see what it will look like.</p>
+        }
+    </div>
+}
+
+<ConfirmDialog Visible="_confirmRun is not null" Title="Print this edition now?" ConfirmText="Print now"
+               OnConfirm="PrintNow" OnCancel="() => _confirmRun = null">
+    <p>Hawker will build <strong>@_confirmRun?.Name</strong> from the latest articles and send it to the edition's printer.
+        Its articles will then count as printed and won't appear in the next scheduled paper.</p>
+</ConfirmDialog>
+
+@code {
+    private IReadOnlyList<EditionSummary>? _editions;
+    private IReadOnlyList<EditionRun>? _runs;
+    private int _feedCount;
+    private EditionSummary? _confirmRun;
+    private string? _message;
+    private bool _claudeConfigured;
+    private Timer? _clock;
+
+    private string Greeting => _editions is null ? "" :
+        _claudeConfigured ? "Claude lays out each paper; articles always print exactly as published."
+                          : "Papers use the standard layout. Add a Claude API key in Settings for smarter layouts.";
+
+    protected override async Task OnInitializedAsync()
+    {
+        Events.RunChanged += OnRunChanged;
+        await LoadAsync();
+        // Keep "next paper" countdowns current.
+        _clock = new Timer(_ => InvokeAsync(StateHasChanged), null, TimeSpan.FromMinutes(1), TimeSpan.FromMinutes(1));
+    }
+
+    private async Task LoadAsync()
+    {
+        _editions = await Editions.ListAsync();
+        _runs = await History.RecentAsync(12);
+        _feedCount = (await Feeds.ListAsync()).Count;
+        _claudeConfigured = (await Claude.GetAsync()).IsConfigured;
+    }
+
+    private void OnRunChanged(int runId) => InvokeAsync(async () =>
+    {
+        await LoadAsync();
+        StateHasChanged();
+    });
+
+    private void PrintNow()
+    {
+        if (_confirmRun is { } edition)
+        {
+            Queue.Enqueue(new RunRequest(edition.Id, RunTrigger.Manual));
+            _message = $"{edition.Name} is being built and will print shortly. Progress appears under Recent runs.";
+        }
+
+        _confirmRun = null;
+    }
+
+    private void Preview(EditionSummary edition)
+    {
+        Queue.Enqueue(new RunRequest(edition.Id, RunTrigger.Preview));
+        _message = $"Building a preview of {edition.Name}. It won't be printed; open it from Recent runs when it's ready (usually under a minute).";
+    }
+
+    private static string Until(DateTimeOffset when)
+    {
+        var span = when - DateTimeOffset.UtcNow;
+        return span.TotalMinutes < 1 ? "any moment"
+            : span.TotalHours < 1 ? $"in {span.Minutes} min"
+            : span.TotalDays < 1 ? $"in {(int)span.TotalHours} h {span.Minutes} min"
+            : $"in {(int)span.TotalDays} d {span.Hours} h";
+    }
+
+    public void Dispose()
+    {
+        Events.RunChanged -= OnRunChanged;
+        _clock?.Dispose();
+    }
+}

@@ -23,6 +23,7 @@ public sealed partial class EditionRunService(
     HawkerPaths paths,
     TimeProvider time,
     IHostApplicationLifetime lifetime,
+    RunEvents events,
     ILogger<EditionRunService> logger)
 {
     /// <summary>How long after printing to look at the print queue for a stuck job.</summary>
@@ -51,6 +52,7 @@ public sealed partial class EditionRunService(
         };
         db.EditionRuns.Add(run);
         await db.SaveChangesAsync(cancellationToken);
+        events.Notify(run.Id);
 
         var log = new List<string> { Describe(request) };
         try
@@ -116,6 +118,7 @@ public sealed partial class EditionRunService(
             run.FinishedAt = time.GetUtcNow();
             run.Log = string.Join('\n', log);
             await db.SaveChangesAsync(CancellationToken.None);
+            events.Notify(run.Id);
         }
 
         logger.LogInformation("Run {Run} of {Edition}: {Status}", run.Id, edition.Name, run.Status);
@@ -160,6 +163,7 @@ public sealed partial class EditionRunService(
 
         run.Log = string.Join('\n', [run.Log, .. log]);
         await db.SaveChangesAsync(CancellationToken.None);
+        events.Notify(run.Id);
         return run;
     }
 
@@ -232,6 +236,7 @@ public sealed partial class EditionRunService(
                 run.Log += $"\nPrint queue check: {problem}";
                 run.Error ??= problem;
                 await db.SaveChangesAsync(stopping);
+                events.Notify(runId);
                 logger.LogWarning("Run {Run}: {Problem}", runId, problem);
             }
             catch (OperationCanceledException)

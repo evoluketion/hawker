@@ -55,11 +55,18 @@ builder.Services.AddTransient<StorySelectionService>();
 builder.Services.AddTransient<ArticlePreparationService>();
 builder.Services.AddSingleton<ClaudeSettingsService>();
 builder.Services.AddSingleton<LayoutEditorResolver>();
+builder.Services.AddSingleton<GeneralSettingsService>();
+builder.Services.AddSingleton<ClaudeConnectionTester>();
+builder.Services.AddTransient<EditionStore>();
+builder.Services.AddTransient<RunHistory>();
+builder.Services.AddTransient<FeedStore>();
+builder.Services.AddTransient<TestPagePrinter>();
 builder.Services.Configure<PdfOptions>(builder.Configuration.GetSection("Hawker:Pdf"));
 builder.Services.AddSingleton<NewspaperRenderer>();
 builder.Services.AddSingleton<PdfRenderer>();
 builder.Services.AddTransient<IEditionComposer, EditionComposer>();
 builder.Services.AddSingleton<EditionRunQueue>();
+builder.Services.AddSingleton<RunEvents>();
 builder.Services.AddTransient<EditionRunService>();
 builder.Services.AddHostedService<EditionRunWorker>();
 builder.Services.AddHostedService<EditionScheduler>();
@@ -93,6 +100,27 @@ app.UseStatusCodePagesWithReExecute("/not-found", createScopeForStatusCodePages:
 app.UseAntiforgery();
 
 app.MapStaticAssets();
+// Archived papers, for viewing in the browser or downloading. Only files inside the archive folder are served.
+app.MapGet("/runs/{id:int}/pdf", async (int id, bool? download, IDbContextFactory<HawkerDbContext> dbFactory, HawkerPaths paths) =>
+{
+    await using var db = await dbFactory.CreateDbContextAsync();
+    var run = await db.EditionRuns.Include(r => r.Edition).SingleOrDefaultAsync(r => r.Id == id);
+    if (run?.PdfPath is not { } pdfPath)
+    {
+        return Results.NotFound();
+    }
+
+    var full = Path.GetFullPath(pdfPath);
+    var archive = Path.GetFullPath(paths.ArchiveDirectory) + Path.DirectorySeparatorChar;
+    if (!full.StartsWith(archive, StringComparison.Ordinal) || !File.Exists(full))
+    {
+        return Results.NotFound();
+    }
+
+    var name = $"{EditionRunService.Slug(run.Edition?.Name ?? "edition")}-{Path.GetFileName(full)}";
+    return Results.File(full, "application/pdf", download == true ? name : null, enableRangeProcessing: true);
+});
+
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();
 

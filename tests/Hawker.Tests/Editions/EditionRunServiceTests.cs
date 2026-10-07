@@ -53,7 +53,7 @@ public sealed class EditionRunServiceTests : IDisposable
     }
 
     private EditionRunService Service() => new(
-        _factory, _composer, _printer, _seen, new HawkerPaths(_dataDir), _time, new FakeLifetime(), NullLogger<EditionRunService>.Instance)
+        _factory, _composer, _printer, _seen, new HawkerPaths(_dataDir), _time, new FakeLifetime(), new RunEvents(), NullLogger<EditionRunService>.Instance)
     {
         JobCheckDelay = TimeSpan.FromDays(1), // never fires during a test
     };

@@ -1,0 +1,12 @@
+@* Shows a time in the given zone, e.g. "Mon 5 Oct, 06:00". *@
+<span class="nowrap" title="@Value?.ToString("u", CultureInfo.InvariantCulture)">@Text</span>
+
+@code {
+    [Parameter] public DateTimeOffset? Value { get; set; }
+    [Parameter] public TimeZoneInfo? Zone { get; set; }
+    [Parameter] public string Empty { get; set; } = "—";
+
+    private string Text => Value is { } v
+        ? TimeZoneInfo.ConvertTime(v, Zone ?? TimeZoneInfo.Local).ToString("ddd d MMM, HH:mm", CultureInfo.InvariantCulture)
+        : Empty;
+}

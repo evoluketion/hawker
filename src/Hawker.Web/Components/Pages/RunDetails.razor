@@ -1,0 +1,146 @@
+@page "/runs/{RunId:int}"
+@implements IDisposable
+@inject RunHistory History
+@inject RunEvents Events
+@inject IServiceScopeFactory Scopes
+
+<PageTitle>@(_run?.Edition?.Name ?? "Run") · Hawker</PageTitle>
+
+@if (_run is null)
+{
+    <p class="muted">@(_loaded ? "That run no longer exists." : "Loading…")</p>
+}
+else
+{
+    <div class="page-head">
+        <div>
+            <h1>@_run.Edition?.Name @(_run.IssueNumber > 0 ? $"· No. {_run.IssueNumber}" : "")</h1>
+            <p class="row">
+                <RunStatusBadge Run="_run" />
+                <span>@RunHistory.DescribeTrigger(_run.Trigger)</span>
+                <span>· started <LocalTime Value="_run.StartedAt" /></span>
+                @if (_run.PrintedAt is { } printed)
+                {
+                    <span>· printed <LocalTime Value="printed" /></span>
+                }
+            </p>
+        </div>
+        <div class="row">
+            @if (HasPdf)
+            {
+                <a class="btn" href="runs/@_run.Id/pdf?download=true">Download PDF</a>
+                <button class="btn btn-primary" disabled="@_printing" @onclick="() => _confirmReprint = true">
+                    @(_printing ? "Printing…" : _run.Printed ? "Print again" : "Print")
+                </button>
+            }
+        </div>
+    </div>
+
+    @if (_run.Error is { } error)
+    {
+        <div class="alert @(_run.Status == RunStatus.Failed ? "alert-bad" : "alert-warn")">@error</div>
+    }
+
+    @if (_reprintMessage is not null)
+    {
+        <div class="alert @(_reprintOk ? "alert-ok" : "alert-bad")">@_reprintMessage</div>
+    }
+
+    @if (_run.Status is RunStatus.Running or RunStatus.Queued)
+    {
+        <div class="alert alert-info">Building the paper. This page updates when it's done.</div>
+    }
+
+    @if (HasPdf)
+    {
+        <iframe class="pdf-frame" src="runs/@_run.Id/pdf" title="The paper as a PDF"></iframe>
+    }
+
+    <h2>What happened</h2>
+    <pre class="log">@(string.IsNullOrWhiteSpace(_run.Log) ? "No log yet." : _run.Log)</pre>
+
+    @if (_run.ArticleUrls.Count > 0)
+    {
+        <h2>Articles</h2>
+        <div class="card">
+            <ol class="small" style="margin:0">
+                @foreach (var url in _run.ArticleUrls)
+                {
+                    <li><a href="@url" target="_blank" rel="noopener">@url</a></li>
+                }
+            </ol>
+        </div>
+    }
+}
+
+<ConfirmDialog Visible="_confirmReprint" Title="@(_run?.Printed == true ? "Print another copy?" : "Print this paper?")"
+               ConfirmText="Print" OnConfirm="ReprintAsync" OnCancel="() => _confirmReprint = false">
+    @if (_run?.Printed == true)
+    {
+        <div class="alert alert-warn">This paper was already printed at <LocalTime Value="_run.PrintedAt" />. Printing again makes another copy.</div>
+    }
+    else if (_run?.Error == PrintException.TimedOutMessage)
+    {
+        <div class="alert alert-warn">The last attempt timed out and may have printed anyway. Check the printer before printing again.</div>
+    }
+    <p>It goes to <strong>@(_run?.Edition?.PrinterName ?? "the default printer")</strong>, @(_run?.Edition?.Copies ?? 1) cop@(_run?.Edition?.Copies == 1 ? "y" : "ies"). Hawker tries once and doesn't retry.</p>
+</ConfirmDialog>
+
+@code {
+    [Parameter] public int RunId { get; set; }
+
+    private EditionRun? _run;
+    private bool _loaded;
+    private bool _confirmReprint;
+    private bool _printing;
+    private string? _reprintMessage;
+    private bool _reprintOk;
+
+    private bool HasPdf => _run?.PdfPath is not null && _run.Status is not (RunStatus.Running or RunStatus.Queued);
+
+    protected override void OnInitialized() => Events.RunChanged += OnRunChanged;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _run = await History.GetAsync(RunId);
+        _loaded = true;
+    }
+
+    private void OnRunChanged(int id)
+    {
+        if (id == RunId)
+        {
+            InvokeAsync(async () =>
+            {
+                _run = await History.GetAsync(RunId);
+                StateHasChanged();
+            });
+        }
+    }
+
+    private async Task ReprintAsync()
+    {
+        _confirmReprint = false;
+        _printing = true;
+        _reprintMessage = null;
+        try
+        {
+            using var scope = Scopes.CreateScope();
+            var run = await scope.ServiceProvider.GetRequiredService<EditionRunService>().ReprintAsync(RunId);
+            _reprintOk = run.Error is null;
+            _reprintMessage = _reprintOk ? "Sent to the printer." : $"Printing failed: {run.Error}";
+        }
+        catch (Exception ex)
+        {
+            _reprintOk = false;
+            _reprintMessage = ex.Message;
+        }
+        finally
+        {
+            _printing = false;
+            _run = await History.GetAsync(RunId);
+        }
+    }
+
+    public void Dispose() => Events.RunChanged -= OnRunChanged;
+}

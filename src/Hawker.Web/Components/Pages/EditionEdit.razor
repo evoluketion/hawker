@@ -1,0 +1,456 @@
+@page "/editions/new"
+@page "/editions/{EditionId:int}"
+@using Hawker.Core.Scheduling
+@inject EditionStore Store
+@inject FeedStore FeedStore
+@inject IPrintService Printers
+@inject EditionRunQueue Queue
+@inject NavigationManager Nav
+
+<PageTitle>@(IsNew ? "New edition" : _form.Name) · Hawker</PageTitle>
+
+<div class="page-head">
+    <div>
+        <h1>@(IsNew ? "New edition" : "Edit edition")</h1>
+        <p><a href="editions">← All editions</a></p>
+    </div>
+</div>
+
+<ErrorList Errors="_errors" />
+@if (_saved)
+{
+    <div class="alert alert-ok">Saved. @(_previewQueued ? "A preview is being built; it will appear on the dashboard and in the archive." : "")</div>
+}
+
+<div class="grid grid-2">
+    <div>
+        <div class="card">
+            <h2>The paper</h2>
+            <div class="field">
+                <label for="name">Name</label>
+                <input id="name" type="text" @bind="_form.Name" placeholder="The Morning Hawker" />
+                <span class="hint">Printed as the masthead.</span>
+            </div>
+            <label class="check"><input type="checkbox" @bind="_form.Enabled" /> <span>Print on schedule<br /><span class="hint">Untick to pause scheduled papers. You can still print or preview by hand.</span></span></label>
+        </div>
+
+        <div class="card">
+            <h2>Feeds</h2>
+            @if (_feeds is null)
+            {
+                <p class="muted">Loading…</p>
+            }
+            else if (_feeds.Count == 0)
+            {
+                <p>No feeds yet. <a href="feeds/new">Add a feed</a> first.</p>
+            }
+            else
+            {
+                @foreach (var item in _feeds)
+                {
+                    <label class="check">
+                        <input type="checkbox" checked="@_form.FeedIds.Contains(item.Feed.Id)" @onchange="e => ToggleFeed(item.Feed.Id, (bool)e.Value!)" />
+                        <span>@item.Feed.Name
+                            @if (item.EffectiveScoreSource != ScoreSource.None)
+                            {
+                                <span class="badge badge-plain">has scores</span>
+                            }
+                            @if (!item.Feed.Enabled)
+                            {
+                                <span class="badge badge-plain">off</span>
+                            }
+                        </span>
+                    </label>
+                }
+            }
+        </div>
+
+        <div class="card">
+            <h2>Articles</h2>
+            <div class="field">
+                <span class="field-label">How many</span>
+                <div class="chips">
+                    @foreach (var n in ArticlePresets)
+                    {
+                        <button type="button" class="chip @(_form.ArticleCount == n && !_customCount ? "on" : "")" @onclick="() => { _form.ArticleCount = n; _customCount = false; }">@n</button>
+                    }
+                    <button type="button" class="chip @(_customCount ? "on" : "")" @onclick="() => _customCount = true">Custom</button>
+                </div>
+                @if (_customCount)
+                {
+                    <input type="number" min="1" max="@EditionForm.MaxArticles" @bind="_form.ArticleCount" aria-label="Number of articles" />
+                }
+                <span class="hint">About @_form.EstimatedPages A4 page@(_form.EstimatedPages == 1 ? "" : "s") with pictures (roughly 1½ stories a page).</span>
+            </div>
+            <div class="field">
+                <label for="sort">Choose the</label>
+                <select id="sort" @bind="_form.SortMode">
+                    <option value="@SortMode.MostRecent">Most recent stories</option>
+                    <option value="@SortMode.MostPopular">Most popular stories</option>
+                </select>
+                @if (_form.SortMode == SortMode.MostPopular)
+                {
+                    <span class="hint">
+                        @if (!SelectedFeedsHaveScores)
+                        {
+                            <text>None of the chosen feeds has popularity scores, so this works like "most recent".</text>
+                        }
+                        else if (!AllSelectedFeedsHaveScores)
+                        {
+                            <text>Feeds without scores are ranked by recency, so each feed's top stories get a fair share.</text>
+                        }
+                        else
+                        {
+                            <text>Ranked by score (e.g. Hacker News points).</text>
+                        }
+                    </span>
+                }
+            </div>
+            <div class="field">
+                <span class="field-label">Look back</span>
+                <div class="chips">
+                    @foreach (var (hours, label) in LookbackPresets)
+                    {
+                        <button type="button" class="chip @(_form.LookbackHours == hours && !_customLookback ? "on" : "")" @onclick="() => SetLookback(hours)">@label</button>
+                    }
+                    <button type="button" class="chip @(_customLookback ? "on" : "")" @onclick="StartCustomLookback">Custom</button>
+                </div>
+                @if (_customLookback)
+                {
+                    <div class="row">
+                        <input type="number" min="1" @bind="LookbackValue" aria-label="Look-back amount" />
+                        <select @bind="LookbackUnit" style="max-width:8rem" aria-label="Look-back unit">
+                            <option value="hours">hours</option>
+                            <option value="days">days</option>
+                        </select>
+                    </div>
+                }
+                <span class="hint">
+                    Only stories published in the last @Hawker.Core.Selection.ArticleSelector.Describe(TimeSpan.FromHours(_form.LookbackHours)) are considered.
+                    @if (SuggestedLookback is { } suggested && suggested != _form.LookbackHours)
+                    {
+                        <text> For this schedule, @Hawker.Core.Selection.ArticleSelector.Describe(TimeSpan.FromHours(suggested)) covers the longest gap between papers. </text>
+                        <button type="button" class="btn-link" @onclick="() => SetLookback(suggested)">Use that</button>
+                    }
+                </span>
+            </div>
+        </div>
+    </div>
+
+    <div>
+        <div class="card">
+            <h2>When it prints</h2>
+            @foreach (var (schedule, index) in _form.Schedules.Select((s, i) => (s, i)))
+            {
+                <div class="schedule">
+                    <div class="row">
+                        <select @bind="schedule.Kind" style="max-width:15rem" aria-label="Schedule type">
+                            <option value="@ScheduleKind.Daily">Once a day</option>
+                            <option value="@ScheduleKind.MultiDaily">Several times a day</option>
+                            <option value="@ScheduleKind.Weekly">Weekly</option>
+                            <option value="@ScheduleKind.Monthly">Monthly</option>
+                            <option value="@ScheduleKind.Cron">Custom (cron)</option>
+                        </select>
+                        <span class="spacer"></span>
+                        <button type="button" class="btn btn-sm btn-danger" @onclick="() => _form.Schedules.Remove(schedule)">Remove</button>
+                    </div>
+
+                    @if (schedule.Kind == ScheduleKind.Weekly)
+                    {
+                        <div class="chips" style="margin-top:.6rem">
+                            @foreach (var day in WeekOrder)
+                            {
+                                <button type="button" class="chip @(schedule.Weekdays.Contains(day) ? "on" : "")" @onclick="() => ToggleDay(schedule, day)">@day.ToString()[..3]</button>
+                            }
+                        </div>
+                    }
+
+                    @if (schedule.Kind == ScheduleKind.Monthly)
+                    {
+                        <div class="row" style="margin-top:.6rem">
+                            <span>On the</span>
+                            <select @bind="schedule.DayOfMonth" style="max-width:9rem" aria-label="Day of the month">
+                                @for (var d = 1; d <= 28; d++)
+                                {
+                                    <option value="@d">@Ordinal(d)</option>
+                                }
+                                <option value="@ScheduleCalculator.LastDayOfMonth">last day</option>
+                            </select>
+                        </div>
+                    }
+
+                    @if (schedule.Kind == ScheduleKind.Cron)
+                    {
+                        <div class="field" style="margin-top:.6rem">
+                            <input type="text" class="mono" @bind="schedule.CronExpression" @bind:event="oninput" placeholder="0 6 * * 1-5" aria-label="Cron expression" />
+                            <span class="hint">Five fields: minute hour day-of-month month day-of-week. <span class="mono">0 6 * * 1-5</span> is 06:00 on weekdays.</span>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="row" style="margin-top:.6rem">
+                            <span>at</span>
+                            @for (var t = 0; t < (schedule.Kind == ScheduleKind.Daily ? 1 : schedule.Times.Count); t++)
+                            {
+                                var timeIndex = t;
+                                <input type="time" @bind="schedule.Times[timeIndex]" aria-label="Time" />
+                                @if (schedule.Kind != ScheduleKind.Daily && schedule.Times.Count > 1)
+                                {
+                                    <button type="button" class="btn btn-sm" title="Remove this time" @onclick="() => schedule.Times.RemoveAt(timeIndex)">✕</button>
+                                }
+                            }
+                            @if (schedule.Kind != ScheduleKind.Daily)
+                            {
+                                <button type="button" class="btn btn-sm" @onclick="() => AddTime(schedule)">+ time</button>
+                            }
+                        </div>
+                    }
+
+                    <div class="schedule-desc" style="margin-top:.6rem">@DescribeSchedule(schedule)</div>
+                </div>
+            }
+            <button type="button" class="btn btn-sm" @onclick="() => _form.Schedules.Add(new ScheduleForm())">+ Add a schedule</button>
+            @if (_form.Schedules.Count == 0)
+            {
+                <p class="hint">With no schedule, this edition only prints when you start it by hand.</p>
+            }
+
+            <div class="field" style="margin-top:1rem">
+                <label for="tz">Time zone</label>
+                <select id="tz" @bind="_form.TimeZone">
+                    @foreach (var zone in TimeZones)
+                    {
+                        <option value="@zone.Id">@zone.DisplayName</option>
+                    }
+                </select>
+            </div>
+
+            @if (NextRuns.Count > 0)
+            {
+                <div class="small">
+                    <div class="field-label">Next papers</div>
+                    <ul style="margin:.3rem 0 0;padding-left:1.1rem">
+                        @foreach (var run in NextRuns)
+                        {
+                            <li><LocalTime Value="run" Zone="Zone" /></li>
+                        }
+                    </ul>
+                </div>
+            }
+        </div>
+
+        <div class="card">
+            <h2>Printing</h2>
+            <label class="check"><input type="checkbox" @bind="_form.AutoPrint" /> <span>Print automatically<br /><span class="hint">Untick to only save each paper as a PDF in the archive.</span></span></label>
+            <div class="field">
+                <label for="printer">Printer</label>
+                <select id="printer" @bind="_form.PrinterName">
+                    <option value="">System default printer</option>
+                    @foreach (var printer in _printers)
+                    {
+                        <option value="@printer.Name">@printer.Name@(printer.IsDefault ? " (default)" : "")</option>
+                    }
+                    @if (!string.IsNullOrEmpty(_form.PrinterName) && _printers.All(p => p.Name != _form.PrinterName))
+                    {
+                        <option value="@_form.PrinterName">@_form.PrinterName (not found)</option>
+                    }
+                </select>
+                @if (_printerError is not null)
+                {
+                    <span class="hint">Couldn't list printers: @_printerError</span>
+                }
+                else if (_printers.Count == 0)
+                {
+                    <span class="hint">No printers were found on this computer.</span>
+                }
+            </div>
+            <div class="row">
+                <div class="field">
+                    <label for="copies">Copies</label>
+                    <input id="copies" type="number" min="1" max="@EditionForm.MaxCopies" @bind="_form.Copies" />
+                </div>
+                <div class="field">
+                    <label for="paper">Paper</label>
+                    <select id="paper" @bind="_form.PaperSize" style="max-width:9rem">
+                        <option value="@PaperSize.A4">A4</option>
+                        <option value="@PaperSize.Letter">US Letter</option>
+                    </select>
+                </div>
+            </div>
+            <label class="check"><input type="checkbox" @bind="_form.Duplex" /> <span>Double-sided<br /><span class="hint">Flipped on the long edge, so it reads like a book when stapled in the corner.</span></span></label>
+            <label class="check"><input type="checkbox" @bind="_form.Greyscale" /> <span>Black and white pictures<br /><span class="hint">Saves colour ink, and looks right on mono laser printers.</span></span></label>
+        </div>
+    </div>
+</div>
+
+<div class="form-actions">
+    <button class="btn btn-primary" @onclick="() => SaveAsync(preview: false)" disabled="@_busy">Save</button>
+    <button class="btn" @onclick="() => SaveAsync(preview: true)" disabled="@_busy">Save and preview</button>
+    <span class="spacer"></span>
+    @if (!IsNew)
+    {
+        <button class="btn btn-danger" @onclick="() => _confirmDelete = true">Delete edition</button>
+    }
+</div>
+
+<ConfirmDialog Visible="_confirmDelete" Title="Delete this edition?" ConfirmText="Delete" Danger="true"
+               OnConfirm="DeleteAsync" OnCancel="() => _confirmDelete = false">
+    <p><strong>@_form.Name</strong> will stop printing and its run history will be removed. PDFs already saved in the archive folder stay on disk.</p>
+</ConfirmDialog>
+
+@code {
+    [Parameter] public int? EditionId { get; set; }
+
+    private static readonly int[] ArticlePresets = [5, 10, 15, 20, 30];
+    private static readonly (int Hours, string Label)[] LookbackPresets = [(12, "12 hours"), (24, "24 hours"), (48, "2 days"), (72, "3 days"), (168, "1 week")];
+    private static readonly DayOfWeek[] WeekOrder =
+        [DayOfWeek.Monday, DayOfWeek.Tuesday, DayOfWeek.Wednesday, DayOfWeek.Thursday, DayOfWeek.Friday, DayOfWeek.Saturday, DayOfWeek.Sunday];
+    private static readonly IReadOnlyList<TimeZoneInfo> TimeZones = TimeZoneInfo.GetSystemTimeZones();
+
+    private EditionForm _form = new();
+    private IReadOnlyList<FeedSummary>? _feeds;
+    private IReadOnlyList<PrinterInfo> _printers = [];
+    private string? _printerError;
+    private IReadOnlyList<string>? _errors;
+    private bool _busy, _saved, _previewQueued, _confirmDelete, _customCount, _customLookback;
+    private string _lookbackUnit = "hours";
+
+    private bool IsNew => EditionId is null;
+    private TimeZoneInfo Zone => EditionComposer.ResolveTimeZone(_form.TimeZone);
+
+    private IReadOnlyList<EditionSchedule> ValidSchedules =>
+        _form.Schedules.Select(s => s.ToEntity()).Where(s => ScheduleCalculator.Validate(s) is null).ToList();
+
+    private IReadOnlyList<DateTimeOffset> NextRuns => ScheduleCalculator.NextOccurrences(ValidSchedules, DateTimeOffset.UtcNow, Zone, 5);
+
+    private int? SuggestedLookback => ValidSchedules.Count == 0 ? null : ScheduleCalculator.SuggestedLookbackHours(ValidSchedules, DateTimeOffset.UtcNow, Zone);
+
+    private IEnumerable<FeedSummary> SelectedFeeds => _feeds?.Where(f => _form.FeedIds.Contains(f.Feed.Id)) ?? [];
+    private bool SelectedFeedsHaveScores => SelectedFeeds.Any(f => f.EffectiveScoreSource != ScoreSource.None);
+    private bool AllSelectedFeedsHaveScores => SelectedFeeds.All(f => f.EffectiveScoreSource != ScoreSource.None);
+
+    private int LookbackValue
+    {
+        get => _lookbackUnit == "days" ? Math.Max(1, _form.LookbackHours / 24) : _form.LookbackHours;
+        set => _form.LookbackHours = _lookbackUnit == "days" ? value * 24 : value;
+    }
+
+    private string LookbackUnit
+    {
+        get => _lookbackUnit;
+        set
+        {
+            var amount = LookbackValue;
+            _lookbackUnit = value;
+            LookbackValue = amount;
+        }
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (EditionId is { } id)
+        {
+            _form = await Store.LoadAsync(id) ?? new EditionForm();
+        }
+
+        _customCount = !ArticlePresets.Contains(_form.ArticleCount);
+        _customLookback = LookbackPresets.All(p => p.Hours != _form.LookbackHours);
+        _lookbackUnit = _form.LookbackHours % 24 == 0 && _form.LookbackHours >= 24 ? "days" : "hours";
+        _feeds = await FeedStore.ListAsync();
+
+        try
+        {
+            _printers = await Printers.ListPrintersAsync();
+        }
+        catch (Exception ex)
+        {
+            _printerError = ex.Message;
+        }
+    }
+
+    private void ToggleFeed(int id, bool on)
+    {
+        if (on)
+        {
+            _form.FeedIds.Add(id);
+        }
+        else
+        {
+            _form.FeedIds.Remove(id);
+        }
+    }
+
+    private void SetLookback(int hours)
+    {
+        _form.LookbackHours = hours;
+        _customLookback = LookbackPresets.All(p => p.Hours != hours);
+        _lookbackUnit = hours % 24 == 0 && hours >= 24 ? "days" : "hours";
+    }
+
+    private void StartCustomLookback() => _customLookback = true;
+
+    private static void ToggleDay(ScheduleForm schedule, DayOfWeek day)
+    {
+        if (!schedule.Weekdays.Remove(day))
+        {
+            schedule.Weekdays.Add(day);
+        }
+    }
+
+    private static void AddTime(ScheduleForm schedule)
+    {
+        var last = schedule.Times.Count > 0 ? schedule.Times.Max() : new TimeOnly(6, 0);
+        schedule.Times.Add(last.AddHours(6));
+    }
+
+    private static string DescribeSchedule(ScheduleForm schedule)
+    {
+        var entity = schedule.ToEntity();
+        return ScheduleCalculator.Validate(entity) ?? ScheduleCalculator.Describe(entity);
+    }
+
+    private static string Ordinal(int day) => day switch
+    {
+        1 or 21 => $"{day}st",
+        2 or 22 => $"{day}nd",
+        3 or 23 => $"{day}rd",
+        _ => $"{day}th",
+    };
+
+    private async Task SaveAsync(bool preview)
+    {
+        _busy = true;
+        _saved = _previewQueued = false;
+        try
+        {
+            var result = await Store.SaveAsync(_form);
+            _errors = result.Errors;
+            if (!result.Succeeded)
+            {
+                return;
+            }
+
+            _saved = true;
+            if (preview)
+            {
+                Queue.Enqueue(new RunRequest(result.Id, RunTrigger.Preview));
+                _previewQueued = true;
+            }
+
+            if (IsNew)
+            {
+                Nav.NavigateTo($"editions/{result.Id}", replace: true);
+            }
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private async Task DeleteAsync()
+    {
+        await Store.DeleteAsync(_form.Id);
+        Nav.NavigateTo("editions");
+    }
+}

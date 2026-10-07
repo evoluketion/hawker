@@ -1,0 +1,318 @@
+@page "/settings"
+@using Hawker.Core
+@inject ClaudeSettingsService Claude
+@inject ClaudeConnectionTester Tester
+@inject GeneralSettingsService General
+@inject IPrintService Printers
+@inject TestPagePrinter TestPage
+@inject HawkerPaths Paths
+
+<PageTitle>Settings · Hawker</PageTitle>
+
+<div class="page-head">
+    <div>
+        <h1>Settings</h1>
+        <p>Layout, printing and scheduling options that apply to every edition.</p>
+    </div>
+</div>
+
+<div class="grid grid-2">
+    <div class="card">
+        <h2>Claude layout editor</h2>
+        <p class="small muted">With an API key, Claude picks the front-page story, groups stories into sections and decides where long stories are cut. It never writes or changes any text. Without a key, the standard layout is used.</p>
+
+        @if (_claude is not null)
+        {
+            <p>
+                @switch (_claude.KeySource)
+                {
+                    case ApiKeySource.Environment:
+                        <span class="badge badge-ok">Key from ANTHROPIC_API_KEY</span>
+                        <span class="small muted"> The environment variable takes precedence over a key saved here.</span>
+                        break;
+                    case ApiKeySource.Settings:
+                        <span class="badge badge-ok">Key saved</span>
+                        <span class="small muted"> Stored encrypted on this computer.</span>
+                        break;
+                    default:
+                        <span class="badge badge-plain">No key: standard layout</span>
+                        break;
+                }
+            </p>
+
+            <div class="field">
+                <label for="api-key">@(_claude.KeySource == ApiKeySource.Settings ? "Replace API key" : "API key")</label>
+                <input id="api-key" type="password" autocomplete="off" @bind="_newKey" @bind:event="oninput" placeholder="sk-ant-…" />
+                <span class="hint">Create one at console.anthropic.com. A layout costs a few cents per paper.</span>
+            </div>
+            <div class="row">
+                <button class="btn btn-primary" @onclick="SaveKeyAsync" disabled="@string.IsNullOrWhiteSpace(_newKey)">Save key</button>
+                @if (_claude.KeySource == ApiKeySource.Settings)
+                {
+                    <button class="btn btn-danger" @onclick="RemoveKeyAsync">Remove key</button>
+                }
+            </div>
+
+            <div class="field" style="margin-top:1rem">
+                <label for="model">Model</label>
+                <select id="model" @bind="_model" @bind:after="SaveModelAsync">
+                    @foreach (var (id, label) in ClaudeSettingsService.Models)
+                    {
+                        <option value="@id">@label</option>
+                    }
+                </select>
+            </div>
+            <button class="btn" @onclick="TestClaudeAsync" disabled="@(!_claude.IsConfigured || _testingClaude)">@(_testingClaude ? "Testing…" : "Test connection")</button>
+            @if (_claudeMessage is not null)
+            {
+                <div class="alert @(_claudeOk ? "alert-ok" : "alert-bad")">@_claudeMessage</div>
+            }
+        }
+    </div>
+
+    <div class="card">
+        <h2>Printers</h2>
+        @if (_printerError is not null)
+        {
+            <div class="alert alert-bad">Couldn't list printers: @_printerError</div>
+        }
+        else if (_printers.Count == 0)
+        {
+            <p>No printers were found on this computer. Add one in your system's printer settings, then reload this page.</p>
+        }
+        else
+        {
+            <ul class="items">
+                @foreach (var p in _printers)
+                {
+                    <li>@p.Name @if (p.IsDefault) { <span class="badge badge-plain">default</span> }</li>
+                }
+            </ul>
+        }
+
+        <h3 style="margin-top:1rem">Test page</h3>
+        <div class="row">
+            <select @bind="_testPrinter" style="max-width:16rem" aria-label="Printer for the test page">
+                <option value="">System default printer</option>
+                @foreach (var p in _printers)
+                {
+                    <option value="@p.Name">@p.Name</option>
+                }
+            </select>
+            <select @bind="_testPaper" style="max-width:8rem" aria-label="Paper size for the test page">
+                <option value="@PaperSize.A4">A4</option>
+                <option value="@PaperSize.Letter">Letter</option>
+            </select>
+            <button class="btn" @onclick="PrintTestPageAsync" disabled="@_printingTest">@(_printingTest ? "Printing…" : "Print test page")</button>
+        </div>
+        @if (_testPageMessage is not null)
+        {
+            <div class="alert @(_testPageOk ? "alert-ok" : "alert-bad")">@_testPageMessage</div>
+        }
+    </div>
+
+    <div class="card">
+        <h2>Print failures</h2>
+        <p class="small muted">When printing fails, the paper is kept in the archive and can be printed again from there. Its articles stay available for the next edition.</p>
+        <ErrorList Errors="_generalErrors" />
+        @if (_general is not null)
+        {
+            <div class="field">
+                <label for="retries">Automatic retries</label>
+                <input id="retries" type="number" min="0" max="@GeneralSettingsService.MaxPrintRetries" @bind="_retries" />
+                <span class="hint">
+                    @if (_retries == 0)
+                    {
+                        <text>Off (recommended). A failed print is tried once and then waits for you.</text>
+                    }
+                    else
+                    {
+                        <text>A print the printer clearly rejected is tried up to @_retries more time@(_retries == 1 ? "" : "s"). A print that timed out is never retried.</text>
+                    }
+                </span>
+            </div>
+            @if (_retries > 0)
+            {
+                <div class="field">
+                    <label for="retry-delay">Wait between retries (seconds)</label>
+                    <input id="retry-delay" type="number" min="10" max="3600" @bind="_retryDelay" />
+                </div>
+            }
+
+            <h3>Catching up</h3>
+            <div class="field">
+                <label for="grace">Catch-up window (minutes)</label>
+                <input id="grace" type="number" min="0" max="1440" @bind="_grace" />
+                <span class="hint">If the computer was off or asleep when a paper was due, it's printed when Hawker starts again, if no more than this many minutes late. Older papers are skipped. 0 never catches up.</span>
+            </div>
+            <div class="form-actions">
+                <button class="btn btn-primary" @onclick="SaveGeneralAsync">Save</button>
+                @if (_generalSaved)
+                {
+                    <span class="badge badge-ok">Saved</span>
+                }
+            </div>
+        }
+    </div>
+
+    <div class="card">
+        <h2>About this installation</h2>
+        <dl class="small" style="display:grid;grid-template-columns:auto 1fr;gap:.3rem 1rem;margin:0">
+            <dt class="muted">Data folder</dt><dd class="mono" style="margin:0;word-break:break-all">@Paths.DataDirectory</dd>
+            <dt class="muted">Archive</dt><dd class="mono" style="margin:0;word-break:break-all">@Paths.ArchiveDirectory</dd>
+            <dt class="muted">Logs</dt><dd class="mono" style="margin:0;word-break:break-all">@Paths.LogDirectory</dd>
+            <dt class="muted">Version</dt><dd style="margin:0">@typeof(Settings).Assembly.GetName().Version</dd>
+        </dl>
+    </div>
+</div>
+
+<ConfirmDialog Visible="_confirmRetries" Title="Turn on automatic print retries?" ConfirmText="@($"Allow {_retries} retr{(_retries == 1 ? "y" : "ies")}")"
+               Danger="true" OnConfirm="ConfirmRetriesAsync" OnCancel="() => _confirmRetries = false">
+    <div class="alert alert-warn">Retries can print the same paper more than once.</div>
+    <ul class="small">
+        <li>A printer can report an error after it has already received the job, for example when it's busy or briefly offline. Hawker then sends the paper again, and you may get duplicates.</li>
+        <li>With @_retries retr@(_retries == 1 ? "y" : "ies"), one failed edition could print up to <strong>@(_retries + 1) times</strong>.</li>
+        <li>Prints that time out are never retried, because those are the most likely to have printed anyway.</li>
+        <li>With retries off, a failed paper waits in the archive and you print it when you're ready.</li>
+    </ul>
+</ConfirmDialog>
+
+@code {
+    private ClaudeSettings? _claude;
+    private string? _newKey;
+    private string _model = "claude-opus-5-5";
+    private bool _testingClaude, _claudeOk;
+    private string? _claudeMessage;
+
+    private IReadOnlyList<PrinterInfo> _printers = [];
+    private string? _printerError;
+    private string _testPrinter = "";
+    private PaperSize _testPaper = PaperSize.A4;
+    private bool _printingTest, _testPageOk;
+    private string? _testPageMessage;
+
+    private GeneralSettings? _general;
+    private int _retries, _retryDelay, _grace;
+    private IReadOnlyList<string>? _generalErrors;
+    private bool _generalSaved, _confirmRetries;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadClaudeAsync();
+        _general = await General.GetAsync();
+        (_retries, _retryDelay, _grace) = (_general.PrintRetryCount, _general.PrintRetryDelaySeconds, _general.MissedRunGraceMinutes);
+
+        try
+        {
+            _printers = await Printers.ListPrintersAsync();
+        }
+        catch (Exception ex)
+        {
+            _printerError = ex.Message;
+        }
+    }
+
+    private async Task LoadClaudeAsync()
+    {
+        _claude = await Claude.GetAsync();
+        _model = _claude.Model;
+    }
+
+    private async Task SaveKeyAsync()
+    {
+        await Claude.SaveApiKeyAsync(_newKey);
+        _newKey = null;
+        _claudeMessage = null;
+        await LoadClaudeAsync();
+    }
+
+    private async Task RemoveKeyAsync()
+    {
+        await Claude.SaveApiKeyAsync(null);
+        _claudeMessage = null;
+        await LoadClaudeAsync();
+    }
+
+    private async Task SaveModelAsync()
+    {
+        await Claude.SaveModelAsync(_model);
+        await LoadClaudeAsync();
+    }
+
+    private async Task TestClaudeAsync()
+    {
+        if (_claude?.ApiKey is not { } key)
+        {
+            return;
+        }
+
+        _testingClaude = true;
+        _claudeMessage = null;
+        try
+        {
+            (_claudeOk, _claudeMessage) = await Tester.TestAsync(key, _model);
+        }
+        finally
+        {
+            _testingClaude = false;
+        }
+    }
+
+    private async Task PrintTestPageAsync()
+    {
+        _printingTest = true;
+        _testPageMessage = null;
+        try
+        {
+            var options = new PrintOptions(string.IsNullOrEmpty(_testPrinter) ? null : _testPrinter, 1, Duplex: false, _testPaper);
+            var result = await TestPage.PrintAsync(options);
+            _testPageOk = true;
+            _testPageMessage = $"Sent to {result.Printer}{(result.JobId is null ? "" : $" (job {result.JobId})")}.";
+        }
+        catch (Exception ex)
+        {
+            _testPageOk = false;
+            _testPageMessage = ex.Message;
+        }
+        finally
+        {
+            _printingTest = false;
+        }
+    }
+
+    private async Task SaveGeneralAsync()
+    {
+        _generalSaved = false;
+        if (_retries > 0 && _retries > (_general?.PrintRetryCount ?? 0))
+        {
+            // Raising retries can mean duplicate papers, so it has to be confirmed first.
+            _generalErrors = GeneralSettingsService.Validate(Current);
+            if (_generalErrors.Count == 0)
+            {
+                _confirmRetries = true;
+            }
+
+            return;
+        }
+
+        await SaveGeneralCoreAsync(retriesConfirmed: false);
+    }
+
+    private async Task ConfirmRetriesAsync()
+    {
+        _confirmRetries = false;
+        await SaveGeneralCoreAsync(retriesConfirmed: true);
+    }
+
+    private GeneralSettings Current => new(_retries, _retryDelay, _grace);
+
+    private async Task SaveGeneralCoreAsync(bool retriesConfirmed)
+    {
+        _generalErrors = await General.SaveAsync(Current, retriesConfirmed);
+        if (_generalErrors.Count == 0)
+        {
+            _general = await General.GetAsync();
+            _generalSaved = true;
+        }
+    }
+}

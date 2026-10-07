@@ -1,0 +1,62 @@
+@page "/feeds"
+@inject FeedStore Store
+
+<PageTitle>Feeds · Hawker</PageTitle>
+
+<div class="page-head">
+    <div>
+        <h1>Feeds</h1>
+        <p>News sources Hawker reads. Any RSS or Atom feed works; editions choose which feeds to use.</p>
+    </div>
+    <a class="btn btn-primary" href="feeds/new">Add feed</a>
+</div>
+
+<div class="card">
+    @if (_feeds is null)
+    {
+        <p class="muted" style="margin:0">Loading…</p>
+    }
+    else if (_feeds.Count == 0)
+    {
+        <p style="margin:0">No feeds yet. <a href="feeds/new">Add your first feed</a>: for example <span class="mono">https://feeds.bbci.co.uk/news/rss.xml</span> or <span class="mono">https://hnrss.org/frontpage</span>.</p>
+    }
+    else
+    {
+        <div class="table-wrap">
+            <table class="table">
+                <thead><tr><th>Name</th><th>Address</th><th>Scores</th><th>Used by</th><th></th></tr></thead>
+                <tbody>
+                    @foreach (var item in _feeds)
+                    {
+                        <tr>
+                            <td>
+                                <strong>@item.Feed.Name</strong>
+                                @if (!item.Feed.Enabled)
+                                {
+                                    <span class="badge badge-plain">Off</span>
+                                }
+                            </td>
+                            <td class="mono small" style="word-break:break-all">@item.Feed.Url</td>
+                            <td class="small">@ScoreLabel(item)</td>
+                            <td class="small">@item.EditionCount edition@(item.EditionCount == 1 ? "" : "s")</td>
+                            <td class="actions"><a class="btn btn-sm" href="feeds/@item.Feed.Id">Edit</a></td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+</div>
+
+@code {
+    private IReadOnlyList<FeedSummary>? _feeds;
+
+    protected override async Task OnInitializedAsync() => _feeds = await Store.ListAsync();
+
+    private static string ScoreLabel(FeedSummary item) => item.EffectiveScoreSource switch
+    {
+        ScoreSource.Hnrss => item.Feed.MinScore is { } min ? $"Hacker News points (min {min})" : "Hacker News points",
+        ScoreSource.Regex => "Custom pattern",
+        _ => "—",
+    };
+}

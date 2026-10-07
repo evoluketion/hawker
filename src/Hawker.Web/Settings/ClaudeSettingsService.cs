@@ -26,6 +26,14 @@ public sealed class ClaudeSettingsService(
 {
     public const string ApiKeyEnvironmentVariable = "ANTHROPIC_API_KEY";
 
+    /// <summary>Models the layout editor is known to work with (structured output, effort and fallbacks).</summary>
+    public static readonly IReadOnlyList<(string Id, string Label)> Models =
+    [
+        ("claude-opus-5-5", "Claude Opus 5.5 (recommended)"),
+        ("claude-sonnet-5-5", "Claude Sonnet 5.5 (faster, lower cost)"),
+        ("claude-fable-5-1", "Claude Fable 5.1 (most capable, highest cost)"),
+    ];
+
     private readonly IDataProtector _protector = dataProtection.CreateProtector("Hawker.ClaudeApiKey");
 
     public async Task<ClaudeSettings> GetAsync(CancellationToken cancellationToken = default)

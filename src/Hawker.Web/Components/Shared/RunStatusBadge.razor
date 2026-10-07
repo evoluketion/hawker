@@ -1,0 +1,21 @@
+<span class="badge @Css" title="@Title">@Label</span>
+
+@code {
+    [Parameter, EditorRequired] public EditionRun Run { get; set; } = default!;
+
+    private (string Css, string Label) Info => Run.Status switch
+    {
+        RunStatus.Queued => ("badge-plain", "Queued"),
+        RunStatus.Running => ("badge-info", "Building…"),
+        RunStatus.Succeeded when Run.Trigger == RunTrigger.Preview => ("badge-info", "Preview ready"),
+        RunStatus.Succeeded when Run.Printed => ("badge-ok", "Printed"),
+        RunStatus.Succeeded => ("badge-ok", "Built"),
+        RunStatus.PrintFailed when Run.Printed => ("badge-ok", "Printed"),
+        RunStatus.PrintFailed => ("badge-warn", "Built, not printed"),
+        _ => ("badge-bad", "Failed"),
+    };
+
+    private string Css => Info.Css;
+    private string Label => Info.Label;
+    private string? Title => Run.Error;
+}
