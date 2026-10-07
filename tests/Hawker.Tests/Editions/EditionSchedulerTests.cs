@@ -28,7 +28,7 @@ public sealed class EditionSchedulerTests : IDisposable
             db.Database.Migrate();
         }
 
-        _scheduler = new EditionScheduler(_factory, _queue, new SeenArticleStore(_factory, _time), _time, NullLogger<EditionScheduler>.Instance);
+        _scheduler = new EditionScheduler(_factory, _queue, new SeenArticleStore(_factory, _time), _time, new StartedLifetime(), NullLogger<EditionScheduler>.Instance);
     }
 
     public void Dispose() => _connection.Dispose();
@@ -121,6 +121,45 @@ public sealed class EditionSchedulerTests : IDisposable
 
         Assert.Empty(plan.Due);
         Assert.Empty(await DrainQueueAsync());
+    }
+
+    [Fact]
+    public async Task Nothing_is_queued_if_the_app_never_finishes_starting()
+    {
+        AddEdition(enabled: true, Monday6am.AddDays(-1)); // a run would be due for catch-up
+        var neverStarted = new NotStartedLifetime();
+        var scheduler = new EditionScheduler(_factory, _queue, new SeenArticleStore(_factory, _time), _time, neverStarted, NullLogger<EditionScheduler>.Instance);
+        _time.Advance(TimeSpan.FromMinutes(30));
+
+        using var stop = new CancellationTokenSource();
+        await scheduler.StartAsync(stop.Token);
+        await Task.Delay(200);
+        await stop.CancelAsync();
+        await scheduler.StopAsync(CancellationToken.None);
+
+        Assert.Empty(await DrainQueueAsync());
+    }
+
+    private sealed class NotStartedLifetime : Microsoft.Extensions.Hosting.IHostApplicationLifetime
+    {
+        public CancellationToken ApplicationStarted => CancellationToken.None;
+        public CancellationToken ApplicationStopping => CancellationToken.None;
+        public CancellationToken ApplicationStopped => CancellationToken.None;
+
+        public void StopApplication()
+        {
+        }
+    }
+
+    private sealed class StartedLifetime : Microsoft.Extensions.Hosting.IHostApplicationLifetime
+    {
+        public CancellationToken ApplicationStarted => new(canceled: true);
+        public CancellationToken ApplicationStopping => CancellationToken.None;
+        public CancellationToken ApplicationStopped => CancellationToken.None;
+
+        public void StopApplication()
+        {
+        }
     }
 
     private sealed class Factory(DbContextOptions<HawkerDbContext> options) : IDbContextFactory<HawkerDbContext>

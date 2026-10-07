@@ -15,6 +15,7 @@ public sealed class EditionScheduler(
     EditionRunQueue queue,
     SeenArticleStore seenArticles,
     TimeProvider time,
+    IHostApplicationLifetime lifetime,
     ILogger<EditionScheduler> logger) : BackgroundService
 {
     public static readonly TimeSpan CheckInterval = TimeSpan.FromSeconds(30);
@@ -24,6 +25,13 @@ public sealed class EditionScheduler(
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
+        // Nothing is scheduled until the whole app, web server included, has started. If startup fails (say the port
+        // is taken), no edition is queued, so no paper can print from a process that is about to exit.
+        if (!await WaitForStartupAsync(stoppingToken))
+        {
+            return;
+        }
+
         var now = time.GetUtcNow();
         await TickAsync(now, lastCheck: null, stoppingToken);
         var lastCheck = now;
@@ -53,6 +61,22 @@ public sealed class EditionScheduler(
                 // Keep lastCheck where it was so the next tick looks at this window again.
                 logger.LogError(ex, "Schedule check failed");
             }
+        }
+    }
+
+    private async Task<bool> WaitForStartupAsync(CancellationToken stoppingToken)
+    {
+        var started = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        using var onStarted = lifetime.ApplicationStarted.Register(() => started.TrySetResult());
+        using var onStopping = stoppingToken.Register(() => started.TrySetCanceled());
+        try
+        {
+            await started.Task;
+            return true;
+        }
+        catch (OperationCanceledException)
+        {
+            return false;
         }
     }
 

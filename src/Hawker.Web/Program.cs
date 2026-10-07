@@ -4,6 +4,7 @@ using Hawker.Core.Articles;
 using Hawker.Core.Data;
 using Hawker.Core.Feeds;
 using Hawker.Core.Selection;
+using Hawker.Web;
 using Hawker.Web.Components;
 using Hawker.Web.Editions;
 using Hawker.Web.Printing;
@@ -17,8 +18,11 @@ using Serilog;
 var builder = WebApplication.CreateBuilder(new WebApplicationOptions
 {
     Args = args,
-    // A Windows service starts in System32, so anchor config and static files to the app folder.
-    ContentRootPath = WindowsServiceHelpers.IsWindowsService() ? AppContext.BaseDirectory : null,
+    // A published build (which has its own wwwroot) always uses its own folder, wherever it is started from. During
+    // development, `dotnet run` uses the project folder.
+    ContentRootPath = WindowsServiceHelpers.IsWindowsService() || Directory.Exists(Path.Combine(AppContext.BaseDirectory, "wwwroot"))
+        ? AppContext.BaseDirectory
+        : null,
 });
 
 builder.Host.UseWindowsService(o => o.ServiceName = "Hawker");
@@ -26,6 +30,13 @@ builder.Host.UseSystemd();
 
 var paths = new HawkerPaths(builder.Configuration["Hawker:DataDirectory"] ?? DefaultDataDirectory());
 builder.Services.AddSingleton(paths);
+
+using var instance = SingleInstance.TryAcquire(paths.DataDirectory);
+if (instance is null)
+{
+    Console.WriteLine($"Hawker is already running (data folder {paths.DataDirectory}). Open {DashboardUrl(builder.Configuration)} to use it.");
+    return 2;
+}
 
 builder.Host.UseSerilog((context, config) => config
     .ReadFrom.Configuration(context.Configuration)
@@ -125,7 +136,30 @@ app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();
 
 app.Logger.LogInformation("Hawker data directory: {DataDirectory}", paths.DataDirectory);
-app.Run();
+try
+{
+    app.Run();
+}
+catch (Exception ex) when (IsAddressInUse(ex))
+{
+    // The port belongs to another program; nothing has been scheduled yet because the scheduler waits for startup.
+    // The host (and its logger) is already disposed here, so write straight to the console.
+    Console.Error.WriteLine($"Another program is already using {DashboardUrl(builder.Configuration)}. " +
+        "Close it, or set Kestrel:Endpoints:Http:Url to a different address.");
+    return 3;
+}
+
+return 0;
+
+static bool IsAddressInUse(Exception? ex) => ex switch
+{
+    null => false,
+    Microsoft.AspNetCore.Connections.AddressInUseException => true,
+    AggregateException aggregate => aggregate.InnerExceptions.Any(IsAddressInUse),
+    _ => IsAddressInUse(ex.InnerException),
+};
+
+static string DashboardUrl(IConfiguration configuration) => configuration["Kestrel:Endpoints:Http:Url"] ?? "http://localhost:5080";
 
 static string DefaultDataDirectory() =>
     OperatingSystem.IsWindows()
