@@ -1,0 +1,45 @@
+# Publishing a release on GitHub (tag e.g. 0.2.0 or v0.2.0) builds both packages and attaches them to it.
+# Each package is attached twice: with the version in its name, and under a fixed name so the README's
+# releases/latest/download links always point at the newest release.
+name: Release
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: write
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Version from tag
+        id: version
+        run: echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+
+      # Browser and System tests need Chromium and real printers, which the runner doesn't have.
+      - name: Test
+        run: dotnet test --configuration Release --filter "Category!=Browser&Category!=System"
+
+      - name: Package
+        run: HAWKER_VERSION="${{ steps.version.outputs.version }}" build/package.sh
+
+      - name: Attach to release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          cp "artifacts/hawker-$VERSION-win-x64.zip" artifacts/hawker-win-x64.zip
+          cp "artifacts/hawker-$VERSION-linux-x64.tar.gz" artifacts/hawker-linux-x64.tar.gz
+          gh release upload "$GITHUB_REF_NAME" --clobber \
+            "artifacts/hawker-$VERSION-win-x64.zip" \
+            "artifacts/hawker-$VERSION-linux-x64.tar.gz" \
+            artifacts/hawker-win-x64.zip \
+            artifacts/hawker-linux-x64.tar.gz

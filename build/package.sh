@@ -4,6 +4,7 @@
 #   build/package.sh                 # both platforms
 #   build/package.sh win-x64         # one platform
 #   SUMATRA_VERSION=3.6.1 build/package.sh
+#   HAWKER_VERSION=0.2.0 build/package.sh  # override the version in Directory.Build.props (releases do this)
 #
 # Needs: the .NET 10 SDK, curl, unzip, zip and tar. Both packages can be built on either OS.
 set -euo pipefail
@@ -14,7 +15,7 @@ sumatra_version="${SUMATRA_VERSION:-3.6.1}"
 rids=("${@:-win-x64 linux-x64}")
 # shellcheck disable=SC2206
 rids=(${rids[@]})
-version="$(sed -n 's:.*<Version>\(.*\)</Version>.*:\1:p' "$root/Directory.Build.props")"
+version="${HAWKER_VERSION:-$(sed -n 's:.*<Version>\(.*\)</Version>.*:\1:p' "$root/Directory.Build.props")}"
 
 mkdir -p "$artifacts"
 
@@ -24,7 +25,7 @@ for rid in "${rids[@]}"; do
   echo "==> Publishing $name"
   rm -rf "$out"
   dotnet publish "$root/src/Hawker.Web" -c Release -r "$rid" --self-contained \
-    -p:DebugType=None -p:DebugSymbols=false -o "$out" --nologo -v quiet
+    -p:Version="$version" -p:DebugType=None -p:DebugSymbols=false -o "$out" --nologo -v quiet
 
   # Some native packages ship their own debug symbols.
   find "$out" -name '*.pdb' -delete

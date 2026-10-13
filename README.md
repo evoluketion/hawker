@@ -28,16 +28,18 @@ The computer needs to be on and awake when a paper is due.
 
 ## Getting started
 
+Download the latest release for [Windows](https://github.com/evoluketion/hawker/releases/latest/download/hawker-win-x64.zip) or [Linux](https://github.com/evoluketion/hawker/releases/latest/download/hawker-linux-x64.tar.gz), or pick a version from [all releases](https://github.com/evoluketion/hawker/releases).
+
 ### Windows
 
-1. Unzip `hawker-<version>-win-x64.zip` somewhere permanent, for example `C:\Hawker`.
+1. Unzip `hawker-win-x64.zip` somewhere permanent, for example `C:\Hawker`.
 2. Double-click **Start Hawker.cmd**. A console window opens and, a few seconds later, the dashboard opens in your browser at <http://localhost:5080>.
 3. Keep the console window open (you can minimise it). Closing it stops Hawker, and papers only print while Hawker is running.
 
 ### Linux
 
 ```bash
-tar -xzf hawker-<version>-linux-x64.tar.gz
+tar -xzf hawker-linux-x64.tar.gz
 cd hawker-<version>-linux-x64
 ./start-hawker.sh
 ```
@@ -110,6 +112,10 @@ build/package.sh win-x64           # or just one
 ```
 
 The packaging script runs on Linux, macOS, or Windows with Git Bash. It downloads SumatraPDF for the Windows package.
+
+### Releasing
+
+Publish a release on GitHub with a version tag such as `0.2.0` (a leading `v` is fine). The **Release** workflow runs the tests, builds both packages with that version and attaches them to the release. Each package is attached with the version in its name and under a fixed name, which the download links above use.
 
 Project layout:
 
