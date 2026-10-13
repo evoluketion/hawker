@@ -24,6 +24,10 @@ public class Edition
 
     /// <summary>Null means the system default printer.</summary>
     public string? PrinterName { get; set; }
+
+    /// <summary>The printer's name for the tray to feed from (e.g. "Main"); null lets the printer choose.</summary>
+    public string? PaperSource { get; set; }
+
     public int Copies { get; set; } = 1;
     public bool Duplex { get; set; } = true;
     public bool AutoPrint { get; set; } = true;

@@ -244,7 +244,7 @@
             <label class="check"><input type="checkbox" @bind="_form.AutoPrint" /> <span>Print automatically<br /><span class="hint">Untick to only save each paper as a PDF in the archive.</span></span></label>
             <div class="field">
                 <label for="printer">Printer</label>
-                <select id="printer" @bind="_form.PrinterName">
+                <select id="printer" @bind="_form.PrinterName" @bind:after="LoadTraysAsync">
                     <option value="">System default printer</option>
                     @foreach (var printer in _printers)
                     {
@@ -263,6 +263,21 @@
                 {
                     <span class="hint">No printers were found on this computer.</span>
                 }
+            </div>
+            <div class="field">
+                <label for="tray">Paper tray</label>
+                <select id="tray" @bind="_form.PaperSource">
+                    <option value="">Printer's choice@(_trays.FirstOrDefault(t => t.IsDefault) is { } defaultTray ? $" ({defaultTray.Name})" : "")</option>
+                    @foreach (var tray in _trays)
+                    {
+                        <option value="@tray.Name">@tray.Name</option>
+                    }
+                    @if (!string.IsNullOrEmpty(_form.PaperSource) && _trays.All(t => t.Name != _form.PaperSource))
+                    {
+                        <option value="@_form.PaperSource">@_form.PaperSource (not offered by this printer)</option>
+                    }
+                </select>
+                <span class="hint">Pick the tray your paper is in if the printer feeds from the wrong one. Names come from the printer's driver.</span>
             </div>
             <div class="row">
                 <div class="field">
@@ -310,6 +325,7 @@
     private EditionForm _form = new();
     private IReadOnlyList<FeedSummary>? _feeds;
     private IReadOnlyList<PrinterInfo> _printers = [];
+    private IReadOnlyList<PaperSourceInfo> _trays = [];
     private string? _printerError;
     private IReadOnlyList<string>? _errors;
     private bool _busy, _saved, _previewQueued, _confirmDelete, _customCount, _customLookback;
@@ -365,6 +381,21 @@
         catch (Exception ex)
         {
             _printerError = ex.Message;
+        }
+
+        await LoadTraysAsync();
+    }
+
+    private async Task LoadTraysAsync()
+    {
+        try
+        {
+            _trays = await Printers.ListPaperSourcesAsync(string.IsNullOrEmpty(_form.PrinterName) ? null : _form.PrinterName);
+        }
+        catch (Exception)
+        {
+            // A printer that can't be asked simply offers no tray choice.
+            _trays = [];
         }
     }
 
