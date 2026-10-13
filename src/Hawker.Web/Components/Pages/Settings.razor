@@ -43,7 +43,7 @@
             <div class="field">
                 <label for="api-key">@(_claude.KeySource == ApiKeySource.Settings ? "Replace API key" : "API key")</label>
                 <input id="api-key" type="password" autocomplete="off" @bind="_newKey" @bind:event="oninput" placeholder="sk-ant-…" />
-                <span class="hint">Create one at console.anthropic.com. A layout costs a few cents per paper.</span>
+                <span class="hint">Create one at <a href="https://platform.claude.com/settings/keys" target="_blank" rel="noopener">platform.claude.com</a>. A Claude Pro or Max subscription doesn't include API access, so add a little prepaid credit there; it's billed separately from your subscription. A layout costs a few cents per paper.</span>
             </div>
             <div class="row">
                 <button class="btn btn-primary" @onclick="SaveKeyAsync" disabled="@string.IsNullOrWhiteSpace(_newKey)">Save key</button>

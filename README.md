@@ -62,7 +62,9 @@ If you start Hawker while it's already running, the second copy exits and the da
 
 ## Claude (optional)
 
-Add an API key from [console.anthropic.com](https://console.anthropic.com) in **Settings**, or set the `ANTHROPIC_API_KEY` environment variable, which takes precedence. The key saved in Settings is stored encrypted on this computer.
+Add an API key from [platform.claude.com](https://platform.claude.com/settings/keys) in **Settings**, or set the `ANTHROPIC_API_KEY` environment variable, which takes precedence. The key saved in Settings is stored encrypted on this computer.
+
+A Claude Pro or Max subscription doesn't include API access, and Anthropic doesn't allow apps like Hawker to sign in with a subscription. Create an API account with the same email, add a little prepaid credit (billed separately from your subscription) and create a key.
 
 - **Model:** Claude Opus 5.5 by default, changeable in Settings. A layout costs a few cents per paper.
 - **What Claude sees:** each story's headline, source, date, score, word counts and its first ~60 words.
