@@ -18,7 +18,6 @@ Embedded in the newspaper template, all under the [SIL Open Font License 1.1](ht
 - Source Serif 4 (Adobe)
 - Playfair Display (Claus Eggers Sørensen)
 - Libre Franklin (Impallari Type)
-- UnifrakturMaguntia (j. 'mach' wust)
 
 ## Libraries
 

@@ -16,7 +16,6 @@ public static class NewspaperAssets
         ("Playfair Display", "PlayfairDisplay.ttf", "normal", "400 900"),
         ("Playfair Display", "PlayfairDisplay-Italic.ttf", "italic", "400 900"),
         ("Libre Franklin", "LibreFranklin.ttf", "normal", "100 900"),
-        ("UnifrakturMaguntia", "UnifrakturMaguntia.ttf", "normal", "400"),
     ];
 
     private static readonly Lazy<string> LazyStylesheet = new(() =>

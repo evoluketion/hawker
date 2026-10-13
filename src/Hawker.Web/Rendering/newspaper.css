@@ -8,7 +8,6 @@
   --serif: "Source Serif 4", "Georgia", "Times New Roman", serif;
   --display: "Playfair Display", "Georgia", serif;
   --sans: "Libre Franklin", "Helvetica Neue", "Arial", sans-serif;
-  --blackletter: "UnifrakturMaguntia", "Old English Text MT", serif;
   --gutter: 4.5mm;
 }
 
@@ -54,8 +53,9 @@ body {
 .ear--right { justify-self: end; text-align: right; }
 
 .masthead-title {
-  font-family: var(--blackletter);
-  font-weight: normal;
+  font-family: var(--display);
+  font-weight: 900;
+  letter-spacing: -0.01em;
   font-size: 46pt;
   line-height: 1;
   margin: 0;
