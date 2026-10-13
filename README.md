@@ -115,7 +115,7 @@ The packaging script runs on Linux, macOS, or Windows with Git Bash. It download
 
 ### Releasing
 
-Publish a release on GitHub with a version tag such as `0.2.0` (a leading `v` is fine). The **Release** workflow runs the tests, builds both packages with that version and attaches them to the release. Each package is attached with the version in its name and under a fixed name, which the download links above use.
+Publish a release on GitHub with a version tag such as `0.2.0` (a leading `v` is fine). The **Release** workflow runs the tests, builds both packages with that version and attaches them to the release. The packages are attached under fixed names (`hawker-win-x64.zip`, `hawker-linux-x64.tar.gz`), which the download links above use.
 
 Project layout:
 

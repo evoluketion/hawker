@@ -1,6 +1,6 @@
 # Publishing a release on GitHub (tag e.g. 0.2.0 or v0.2.0) builds both packages and attaches them to it.
-# Each package is attached twice: with the version in its name, and under a fixed name so the README's
-# releases/latest/download links always point at the newest release.
+# The packages are attached under fixed names so the README's releases/latest/download links always point at the
+# newest release; the folder inside each archive still carries the version.
 name: Release
 
 on:
@@ -36,10 +36,6 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           VERSION: ${{ steps.version.outputs.version }}
         run: |
-          cp "artifacts/hawker-$VERSION-win-x64.zip" artifacts/hawker-win-x64.zip
-          cp "artifacts/hawker-$VERSION-linux-x64.tar.gz" artifacts/hawker-linux-x64.tar.gz
-          gh release upload "$GITHUB_REF_NAME" --clobber \
-            "artifacts/hawker-$VERSION-win-x64.zip" \
-            "artifacts/hawker-$VERSION-linux-x64.tar.gz" \
-            artifacts/hawker-win-x64.zip \
-            artifacts/hawker-linux-x64.tar.gz
+          mv "artifacts/hawker-$VERSION-win-x64.zip" artifacts/hawker-win-x64.zip
+          mv "artifacts/hawker-$VERSION-linux-x64.tar.gz" artifacts/hawker-linux-x64.tar.gz
+          gh release upload "$GITHUB_REF_NAME" --clobber artifacts/hawker-win-x64.zip artifacts/hawker-linux-x64.tar.gz
