@@ -134,6 +134,69 @@ public class PrintServiceTests
     }
 
     [Fact]
+    public void Cups_feeds_from_the_chosen_tray()
+    {
+        var args = CupsPrintService.BuildArguments("/tmp/x.pdf", OfficeDuplexA4 with { PaperSource = "Main" });
+
+        Assert.Contains("InputSlot=Main", args);
+        Assert.DoesNotContain(CupsPrintService.BuildArguments("/tmp/x.pdf", OfficeDuplexA4), a => a.StartsWith("InputSlot="));
+    }
+
+    [Fact]
+    public void Trays_are_read_from_lpoptions_with_the_default_marked()
+    {
+        // Real output from a Canon TS5300 series.
+        var output = """
+            PageSize/Media Size: 3.5x5 *A4 Letter
+            InputSlot/Media Source: *Auto Main Rear
+            Duplex/Duplex: *None DuplexNoTumble DuplexTumble
+            """;
+
+        Assert.Equal(
+            [new PaperSourceInfo("Auto", true), new PaperSourceInfo("Main", false), new PaperSourceInfo("Rear", false)],
+            CupsPrintService.ParsePaperSources(output));
+        Assert.Empty(CupsPrintService.ParsePaperSources("PageSize/Media Size: *A4 Letter"));
+    }
+
+    [Fact]
+    public async Task Cups_asks_the_named_printer_for_its_trays()
+    {
+        var runner = new FakeRunner((_, _) => new ProcessResult(0, "InputSlot/Media Source: *Auto Main Rear\n", ""));
+        var service = new CupsPrintService(runner, NullLogger<CupsPrintService>.Instance);
+
+        var trays = await service.ListPaperSourcesAsync("TS5300_series");
+
+        Assert.Equal(3, trays.Count);
+        Assert.Equal("lpoptions", runner.Calls[0].File);
+        Assert.Equal(["-p", "TS5300_series", "-l"], runner.Calls[0].Args);
+    }
+
+    [Fact]
+    public void Sumatra_feeds_from_the_chosen_bin()
+    {
+        var args = WindowsPrintService.BuildArguments("paper.pdf", OfficeDuplexA4 with { PaperSource = "Cassette, upper" });
+
+        Assert.Contains("duplexlong,2x,paper=A4,fit,bin=Cassette  upper", args);
+    }
+
+    [Fact]
+    [Trait("Category", "System")]
+    public async Task Real_lpoptions_lists_trays_for_each_installed_printer()
+    {
+        if (OperatingSystem.IsWindows() || !File.Exists("/usr/bin/lpoptions"))
+        {
+            return;
+        }
+
+        var service = new CupsPrintService(new ProcessRunner(), NullLogger<CupsPrintService>.Instance);
+        foreach (var printer in await service.ListPrintersAsync())
+        {
+            var trays = await service.ListPaperSourcesAsync(printer.Name);
+            Assert.True(trays.Count(t => t.IsDefault) <= 1, $"{printer.Name} reported more than one default tray");
+        }
+    }
+
+    [Fact]
     public void Sumatra_arguments_print_silently_with_settings()
     {
         var args = WindowsPrintService.BuildArguments(@"C:\ProgramData\Hawker\archive\paper.pdf", OfficeDuplexA4);
@@ -160,9 +223,10 @@ public class PrintServiceTests
     [Fact]
     public void Print_options_come_from_the_edition()
     {
-        var edition = new Edition { Name = "E", PrinterName = "  ", Copies = 0, Duplex = false, PaperSize = PaperSize.Letter };
+        var edition = new Edition { Name = "E", PrinterName = "  ", Copies = 0, Duplex = false, PaperSize = PaperSize.Letter, PaperSource = " " };
 
-        Assert.Equal(new PrintOptions(null, 1, false, PaperSize.Letter), PrintOptions.For(edition));
+        Assert.Equal(new PrintOptions(null, 1, false, PaperSize.Letter, null), PrintOptions.For(edition));
+        Assert.Equal("Main", PrintOptions.For(new Edition { Name = "E", PaperSource = "Main" }).PaperSource);
     }
 
     [Fact]

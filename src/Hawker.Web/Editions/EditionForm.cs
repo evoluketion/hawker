@@ -21,6 +21,7 @@ public sealed class EditionForm
     public PaperSize PaperSize { get; set; } = PaperSize.A4;
     public bool Greyscale { get; set; }
     public string? PrinterName { get; set; }
+    public string? PaperSource { get; set; }
     public int Copies { get; set; } = 1;
     public bool Duplex { get; set; } = true;
     public bool AutoPrint { get; set; } = true;
@@ -90,6 +91,7 @@ public sealed class EditionForm
         PaperSize = edition.PaperSize,
         Greyscale = edition.Greyscale,
         PrinterName = edition.PrinterName,
+        PaperSource = edition.PaperSource,
         Copies = edition.Copies,
         Duplex = edition.Duplex,
         AutoPrint = edition.AutoPrint,
@@ -107,6 +109,7 @@ public sealed class EditionForm
         edition.PaperSize = PaperSize;
         edition.Greyscale = Greyscale;
         edition.PrinterName = string.IsNullOrWhiteSpace(PrinterName) ? null : PrinterName;
+        edition.PaperSource = string.IsNullOrWhiteSpace(PaperSource) ? null : PaperSource;
         edition.Copies = Copies;
         edition.Duplex = Duplex;
         edition.AutoPrint = AutoPrint;

@@ -20,6 +20,28 @@ public sealed partial class CupsPrintService(IProcessRunner runner, ILogger<Cups
             .ToList();
     }
 
+    public async Task<IReadOnlyList<PaperSourceInfo>> ListPaperSourcesAsync(string? printerName, CancellationToken cancellationToken = default)
+    {
+        var result = await RunAsync("lpoptions", printerName is null ? ["-l"] : ["-p", printerName, "-l"], cancellationToken);
+        return result.ExitCode == 0 ? ParsePaperSources(result.StandardOutput) : [];
+    }
+
+    /// <summary>Reads the tray choices from <c>lpoptions -l</c>: "InputSlot/Media Source: *Auto Main Rear" (* marks the default).</summary>
+    public static IReadOnlyList<PaperSourceInfo> ParsePaperSources(string lpoptionsOutput)
+    {
+        var line = lpoptionsOutput.Split('\n').FirstOrDefault(l => l.StartsWith("InputSlot/", StringComparison.Ordinal) || l.StartsWith("InputSlot:", StringComparison.Ordinal));
+        var colon = line?.IndexOf(':') ?? -1;
+        if (line is null || colon < 0)
+        {
+            return [];
+        }
+
+        return line[(colon + 1)..]
+            .Split(' ', StringSplitOptions.RemoveEmptyEntries)
+            .Select(choice => choice.StartsWith('*') ? new PaperSourceInfo(choice[1..], true) : new PaperSourceInfo(choice, false))
+            .ToList();
+    }
+
     public async Task<PrintResult> PrintAsync(string pdfPath, PrintOptions options, CancellationToken cancellationToken = default)
     {
         var arguments = BuildArguments(pdfPath, options);
@@ -71,6 +93,11 @@ public sealed partial class CupsPrintService(IProcessRunner runner, ILogger<Cups
         // Long-edge duplex reads like a book when the pages are stapled in the top-left corner.
         arguments.AddRange(["-o", options.Duplex ? "sides=two-sided-long-edge" : "sides=one-sided"]);
         arguments.AddRange(["-o", options.PaperSize == PaperSize.Letter ? "media=Letter" : "media=A4"]);
+        if (options.PaperSource is { } tray)
+        {
+            arguments.AddRange(["-o", $"InputSlot={tray}"]);
+        }
+
         // Copies come out as complete sets, ready to staple, rather than all page 1s then all page 2s.
         arguments.AddRange(["-o", "collate=true"]);
         arguments.AddRange(["-o", "fit-to-page"]);
