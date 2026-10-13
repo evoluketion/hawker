@@ -16,8 +16,8 @@ public class NewspaperRenderingTests
 {
     private static readonly DateTimeOffset Now = new(2026, 10, 5, 6, 0, 0, TimeSpan.Zero);
 
-    private static NewspaperModel Model(LayoutPlan plan, IReadOnlyList<Article> articles, PaperSize paper = PaperSize.A4) =>
-        NewspaperModelBuilder.Build("The Morning Hawker", 12, paper, Now, TimeZoneInfo.Utc, plan, articles);
+    private static NewspaperModel Model(LayoutPlan plan, IReadOnlyList<Article> articles, PaperSize paper = PaperSize.A4, string name = "The Morning Hawker") =>
+        NewspaperModelBuilder.Build(name, 12, paper, Now, TimeZoneInfo.Utc, plan, articles);
 
     private static async Task<string> RenderAsync(NewspaperModel model)
     {
@@ -125,5 +125,61 @@ public class NewspaperRenderingTests
 
         Assert.True(pdf.Length > 10_000);
         Assert.Equal("%PDF", System.Text.Encoding.ASCII.GetString(pdf, 0, 4));
+    }
+
+    [Theory]
+    [Trait("Category", "Browser")]
+    [InlineData("Hawker Tuah", PaperSize.A4, 46, false)]
+    [InlineData("The Morning Hawker", PaperSize.A4, 40, false)]
+    [InlineData("The Greater Metropolitan Evening Chronicle", PaperSize.A4, 20, false)]
+    [InlineData("The Greater Metropolitan Evening Chronicle", PaperSize.Letter, 20, false)]
+    [InlineData("The Quite Extraordinarily Long-Winded Weekly Digest of Everything Worth Reading", PaperSize.A4, 20, true)]
+    public async Task The_masthead_shrinks_to_fit_long_names(string name, PaperSize paper, double minimumPt, bool wraps)
+    {
+        Article[] articles = [Make("a1")];
+        var plan = LayoutPlanValidator.Validate(DeterministicLayoutEditor.Plan(articles), articles).Plan;
+        var html = await RenderAsync(Model(plan, articles, paper, name));
+
+        using var playwright = await Microsoft.Playwright.Playwright.CreateAsync();
+        await using var browser = await playwright.Chromium.LaunchAsync(new() { Headless = true });
+        var page = await browser.NewPageAsync();
+        await page.SetContentAsync(html);
+        await PdfRenderer.FitMastheadAsync(page, paper);
+
+        // Lay the page out at the printed width, then check the title stays between the ears.
+        await page.SetViewportSizeAsync((int)Math.Floor(PdfRenderer.ContentWidthMm(paper) * 96 / 25.4), 1000);
+        var fit = await page.EvaluateAsync<MastheadFit>("""
+            () => {
+              const title = document.querySelector('.masthead-title');
+              const [left, right] = [...document.querySelectorAll('.masthead-ears .ear')].map(e => e.getBoundingClientRect());
+              const text = document.createRange();
+              text.selectNodeContents(title);
+              const box = text.getBoundingClientRect();
+              return {
+                fontPt: Math.round(parseFloat(getComputedStyle(title).fontSize) * 72 / 96 * 10) / 10,
+                lines: Math.round(box.height / parseFloat(getComputedStyle(title).lineHeight)),
+                clearOfEars: box.left >= left.right && box.right <= right.left,
+              };
+            }
+            """);
+
+        Assert.True(fit.FontPt >= minimumPt && fit.FontPt <= 46, $"Masthead set at {fit.FontPt}pt");
+        Assert.True(fit.ClearOfEars, "The masthead overlaps the ears");
+        Assert.Equal(wraps, fit.Lines > 1);
+        if (minimumPt == 46)
+        {
+            Assert.Equal(46, fit.FontPt, 1);
+        }
+        else
+        {
+            Assert.True(fit.FontPt < 46);
+        }
+    }
+
+    private sealed class MastheadFit
+    {
+        public double FontPt { get; set; }
+        public int Lines { get; set; }
+        public bool ClearOfEars { get; set; }
     }
 }
