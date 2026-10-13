@@ -92,23 +92,13 @@
 
         <h3 style="margin-top:1rem">Test page</h3>
         <div class="row">
-            <select @bind="_testPrinter" @bind:after="LoadTestTraysAsync" style="max-width:16rem" aria-label="Printer for the test page">
+            <select @bind="_testPrinter" style="max-width:16rem" aria-label="Printer for the test page">
                 <option value="">System default printer</option>
                 @foreach (var p in _printers)
                 {
                     <option value="@p.Name">@p.Name</option>
                 }
             </select>
-            @if (_testTrays.Count > 0)
-            {
-                <select @bind="_testTray" style="max-width:12rem" aria-label="Paper tray for the test page">
-                    <option value="">Printer's choice@(_testTrays.FirstOrDefault(t => t.IsDefault) is { } defaultTray ? $" ({defaultTray.Name})" : "")</option>
-                    @foreach (var tray in _testTrays)
-                    {
-                        <option value="@tray.Name">@tray.Name</option>
-                    }
-                </select>
-            }
             <select @bind="_testPaper" style="max-width:8rem" aria-label="Paper size for the test page">
                 <option value="@PaperSize.A4">A4</option>
                 <option value="@PaperSize.Letter">Letter</option>
@@ -197,8 +187,6 @@
     private IReadOnlyList<PrinterInfo> _printers = [];
     private string? _printerError;
     private string _testPrinter = "";
-    private string _testTray = "";
-    private IReadOnlyList<PaperSourceInfo> _testTrays = [];
     private PaperSize _testPaper = PaperSize.A4;
     private bool _printingTest, _testPageOk;
     private string? _testPageMessage;
@@ -222,8 +210,6 @@
         {
             _printerError = ex.Message;
         }
-
-        await LoadTestTraysAsync();
     }
 
     private async Task LoadClaudeAsync()
@@ -278,8 +264,7 @@
         _testPageMessage = null;
         try
         {
-            var options = new PrintOptions(string.IsNullOrEmpty(_testPrinter) ? null : _testPrinter, 1, Duplex: false, _testPaper,
-                string.IsNullOrEmpty(_testTray) ? null : _testTray);
+            var options = new PrintOptions(string.IsNullOrEmpty(_testPrinter) ? null : _testPrinter, 1, Duplex: false, _testPaper);
             var result = await TestPage.PrintAsync(options);
             _testPageOk = true;
             _testPageMessage = $"Sent to {result.Printer}{(result.JobId is null ? "" : $" (job {result.JobId})")}.";
@@ -292,19 +277,6 @@
         finally
         {
             _printingTest = false;
-        }
-    }
-
-    private async Task LoadTestTraysAsync()
-    {
-        _testTray = "";
-        try
-        {
-            _testTrays = await Printers.ListPaperSourcesAsync(string.IsNullOrEmpty(_testPrinter) ? null : _testPrinter);
-        }
-        catch (Exception)
-        {
-            _testTrays = [];
         }
     }
 

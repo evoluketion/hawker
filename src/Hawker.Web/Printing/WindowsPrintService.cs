@@ -31,29 +31,6 @@ public sealed class WindowsPrintService(IProcessRunner runner, IOptions<Printing
     }
 
     [SupportedOSPlatform("windows")]
-    public Task<IReadOnlyList<PaperSourceInfo>> ListPaperSourcesAsync(string? printerName, CancellationToken cancellationToken = default)
-    {
-        var settings = new PrinterSettings();
-        if (printerName is not null)
-        {
-            settings.PrinterName = printerName;
-        }
-
-        if (!settings.IsValid)
-        {
-            return Task.FromResult<IReadOnlyList<PaperSourceInfo>>([]);
-        }
-
-        var defaultSource = settings.DefaultPageSettings.PaperSource.SourceName;
-        IReadOnlyList<PaperSourceInfo> sources = settings.PaperSources
-            .Cast<System.Drawing.Printing.PaperSource>()
-            .Select(s => new PaperSourceInfo(s.SourceName, s.SourceName == defaultSource))
-            .DistinctBy(s => s.Name)
-            .ToList();
-        return Task.FromResult(sources);
-    }
-
-    [SupportedOSPlatform("windows")]
     public async Task<PrintResult> PrintAsync(string pdfPath, PrintOptions printOptions, CancellationToken cancellationToken = default)
     {
         var sumatra = FindSumatra(options.Value.SumatraPath)
@@ -100,20 +77,11 @@ public sealed class WindowsPrintService(IProcessRunner runner, IOptions<Printing
         }
 
         // Long-edge duplex reads like a book when stapled in the top-left corner; "fit" scales to the paper.
-        var parts = new List<string>
-        {
+        var settings = string.Join(',',
             options.Duplex ? "duplexlong" : "simplex",
             $"{options.Copies}x",
             options.PaperSize == PaperSize.Letter ? "paper=letter" : "paper=A4",
-            "fit",
-        };
-        if (options.PaperSource is { } tray)
-        {
-            // SumatraPDF separates settings with commas, so a tray name cannot contain one.
-            parts.Add($"bin={tray.Replace(",", " ")}");
-        }
-
-        var settings = string.Join(',', parts);
+            "fit");
         arguments.AddRange(["-print-settings", settings, "-silent", "-exit-on-print", pdfPath]);
         return arguments;
     }

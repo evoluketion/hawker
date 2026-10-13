@@ -35,7 +35,6 @@ public sealed class TestPagePrinter(PdfRenderer pdfRenderer, IPrintService print
           <div class="box"><dl>
             <dt>Printer</dt><dd>{{WebUtility.HtmlEncode(options.PrinterName ?? "System default")}}</dd>
             <dt>Paper</dt><dd>{{options.PaperSize}}</dd>
-            <dt>Tray</dt><dd>{{WebUtility.HtmlEncode(options.PaperSource ?? "Printer's choice")}}</dd>
             <dt>Double-sided</dt><dd>{{(options.Duplex ? "Yes (this is a single page, so only one side prints)" : "No")}}</dd>
             <dt>Printed</dt><dd>{{now:dddd d MMMM yyyy, HH:mm}}</dd>
           </dl></div>

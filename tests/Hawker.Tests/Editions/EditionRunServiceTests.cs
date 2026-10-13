@@ -276,9 +276,6 @@ public sealed class EditionRunServiceTests : IDisposable
         public Task<IReadOnlyList<PrinterInfo>> ListPrintersAsync(CancellationToken cancellationToken = default) =>
             Task.FromResult<IReadOnlyList<PrinterInfo>>([new PrinterInfo("Office", true)]);
 
-        public Task<IReadOnlyList<PaperSourceInfo>> ListPaperSourcesAsync(string? printerName, CancellationToken cancellationToken = default) =>
-            Task.FromResult<IReadOnlyList<PaperSourceInfo>>([new PaperSourceInfo("Main", false)]);
-
         public Task<PrintResult> PrintAsync(string pdfPath, PrintOptions options, CancellationToken cancellationToken = default)
         {
             Attempts.Add(options);

@@ -107,9 +107,6 @@ namespace Hawker.Core.Data.Migrations
                         .IsRequired()
                         .HasColumnType("TEXT");
 
-                    b.Property<string>("PaperSource")
-                        .HasColumnType("TEXT");
-
                     b.Property<string>("PrinterName")
                         .HasColumnType("TEXT");
 

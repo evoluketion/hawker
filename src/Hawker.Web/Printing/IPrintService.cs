@@ -5,19 +5,11 @@ namespace Hawker.Web.Printing;
 public sealed record PrinterInfo(string Name, bool IsDefault);
 
 /// <param name="PrinterName">Null prints to the system default printer.</param>
-/// <param name="PaperSource">The tray to feed from, as the printer names it; null lets the printer choose.</param>
-public sealed record PrintOptions(string? PrinterName, int Copies, bool Duplex, PaperSize PaperSize, string? PaperSource = null)
+public sealed record PrintOptions(string? PrinterName, int Copies, bool Duplex, PaperSize PaperSize)
 {
-    public static PrintOptions For(Edition edition) => new(
-        string.IsNullOrWhiteSpace(edition.PrinterName) ? null : edition.PrinterName,
-        Math.Max(1, edition.Copies),
-        edition.Duplex,
-        edition.PaperSize,
-        string.IsNullOrWhiteSpace(edition.PaperSource) ? null : edition.PaperSource);
+    public static PrintOptions For(Edition edition) =>
+        new(string.IsNullOrWhiteSpace(edition.PrinterName) ? null : edition.PrinterName, Math.Max(1, edition.Copies), edition.Duplex, edition.PaperSize);
 }
-
-/// <param name="Name">What the print system calls the tray, e.g. "Main" or "Rear".</param>
-public sealed record PaperSourceInfo(string Name, bool IsDefault);
 
 /// <param name="JobId">The print system's job reference, when it reports one.</param>
 public sealed record PrintResult(string Printer, string? JobId);
@@ -41,10 +33,6 @@ public sealed class PrintException(string message, Exception? inner = null, bool
 public interface IPrintService
 {
     Task<IReadOnlyList<PrinterInfo>> ListPrintersAsync(CancellationToken cancellationToken = default);
-
-    /// <summary>The trays a printer reports; empty when it reports none or cannot be asked.</summary>
-    /// <param name="printerName">Null for the system default printer.</param>
-    Task<IReadOnlyList<PaperSourceInfo>> ListPaperSourcesAsync(string? printerName, CancellationToken cancellationToken = default);
 
     /// <exception cref="PrintException">The printer or print system rejected the job.</exception>
     Task<PrintResult> PrintAsync(string pdfPath, PrintOptions options, CancellationToken cancellationToken = default);
