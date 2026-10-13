@@ -28,7 +28,7 @@
                 <strong>Inside</strong>
                 @foreach (var (part, index) in Model.Sections.Select((s, i) => (s, i)))
                 {
-                    <span>@(index > 0 ? " · " : " ")@part.Name (@part.StoryCount)</span>
+                    <span>@(index > 0 ? " · " : " ")@part.Name</span>
                 }
             </div>
         }

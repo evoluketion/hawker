@@ -15,7 +15,7 @@ public sealed record NewspaperModel(
     StoryView Lead,
     IReadOnlyList<SectionView> Sections)
 {
-    public int StoryCount => 1 + Sections.Sum(s => s.Majors.Count + s.Minors.Count + s.Briefs.Count);
+    public int StoryCount => 1 + Sections.Sum(s => s.StoryCount);
 }
 
 public sealed record SectionView(string Name, IReadOnlyList<StoryView> Majors, IReadOnlyList<StoryView> Minors, IReadOnlyList<StoryView> Briefs)
