@@ -68,7 +68,8 @@ public sealed partial class EditionRunService(
                 edition.IssueCounter = issueNumber;
             }
 
-            var hashes = composed.Articles.Select(a => a.UrlHash).ToList();
+            // Stories left out as non-articles count as seen too, so they are not picked again next time.
+            var hashes = composed.Articles.Select(a => a.UrlHash).Concat(composed.LeftOutUrlHashes ?? []).ToList();
             if (isPreview)
             {
                 run.Status = RunStatus.Succeeded;

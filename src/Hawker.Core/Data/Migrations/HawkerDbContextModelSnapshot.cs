@@ -254,6 +254,9 @@ namespace Hawker.Core.Data.Migrations
                     b.Property<bool>("SkipLiveBlogs")
                         .HasColumnType("INTEGER");
 
+                    b.Property<bool>("SkipNonArticlePages")
+                        .HasColumnType("INTEGER");
+
                     b.Property<string>("Url")
                         .IsRequired()
                         .HasMaxLength(2000)

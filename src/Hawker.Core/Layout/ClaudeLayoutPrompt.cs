@@ -27,13 +27,16 @@ public static class ClaudeLayoutPrompt
 
         - lead: the single story for the top of the front page. Pick the most significant, broadly interesting story, preferring
           one with a usable picture (has_image with a reasonably large image) and enough text to fill three columns.
+          Never lead with a page_kind "not_article" story (a product, landing or tool page, a repository and the like) and
+          prefer independent reporting over a page_kind "announcement" (a company announcing its own product or deal).
         - sections: group the remaining stories into sections by topic, using only the allowed section names. Order sections by
           importance, and stories within a section from most to least important. Two to five sections usually reads best; avoid
           sections with a single brief.
         - size of each story:
             major = full width, large headline (use for the next two or three most important stories with pictures)
             minor = half width (most stories)
-            brief = headline and first paragraph only, in an "In brief" box (very short or less important items)
+            brief = headline and first paragraph only, in an "In brief" box (very short or less important items, and every
+                    page_kind "not_article" story)
         - show_image: whether to print the story's picture. Drop pictures that are small (under ~450px wide) for lead or major
           stories, and on minor stories when space is tight.
         - keep_blocks: how many text blocks (paragraphs, quotes, list items) to print before the story is cut with a
@@ -62,6 +65,7 @@ public static class ClaudeLayoutPrompt
             a.LeadImage?.DataUri is not null,
             a.LeadImage?.Width,
             a.LeadImage?.Height,
+            PageKindName(a.Page.Kind),
             Excerpt(a)));
 
         var payload = new { edition = request.EditionName, articles };
@@ -155,6 +159,13 @@ public static class ClaudeLayoutPrompt
         _ => StorySize.Minor,
     };
 
+    private static string PageKindName(PageKind kind) => kind switch
+    {
+        PageKind.Announcement => "announcement",
+        PageKind.NotArticle => "not_article",
+        _ => "article",
+    };
+
     private static string Excerpt(Article article)
     {
         var first = article.Blocks.FirstOrDefault(b => b.Kind == BlockKind.Paragraph);
@@ -187,6 +198,7 @@ public static class ClaudeLayoutPrompt
         bool HasImage,
         int? ImageWidth,
         int? ImageHeight,
+        string PageKind,
         string Excerpt);
 
     private sealed record PlanResponse(Placement? Lead, List<SectionResponse>? Sections);

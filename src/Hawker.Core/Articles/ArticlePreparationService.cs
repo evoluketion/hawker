@@ -3,7 +3,8 @@ using Hawker.Core.Selection;
 
 namespace Hawker.Core.Articles;
 
-public sealed record PreparationResult(IReadOnlyList<Article> Articles, IReadOnlyList<string> Notes);
+/// <param name="LeftOut">URL hashes of stories left out because their feed skips pages that are not articles.</param>
+public sealed record PreparationResult(IReadOnlyList<Article> Articles, IReadOnlyList<string> Notes, IReadOnlyList<string> LeftOut);
 
 /// <summary>Turns the selected feed items into finished articles: full text, cleaned HTML and embedded images.</summary>
 public sealed class ArticlePreparationService(PageExtractor extractor, ImageProcessor images)
@@ -31,8 +32,9 @@ public sealed class ArticlePreparationService(PageExtractor extractor, ImageProc
             await gate.WaitAsync(cancellationToken);
             try
             {
-                var fetchFullText = feeds.GetValueOrDefault(article.Item.FeedId)?.FetchFullText ?? true;
-                return await PrepareOneAsync($"a{index + 1}", article, fetchFullText, imageOptions, cancellationToken);
+                var feed = feeds.GetValueOrDefault(article.Item.FeedId);
+                return await PrepareOneAsync($"a{index + 1}", article, feed?.FetchFullText ?? true, feed?.SkipNonArticlePages ?? false,
+                    imageOptions, cancellationToken);
             }
             finally
             {
@@ -41,11 +43,14 @@ public sealed class ArticlePreparationService(PageExtractor extractor, ImageProc
         });
 
         var prepared = await Task.WhenAll(tasks);
-        return new PreparationResult(prepared.Select(p => p.Article).ToList(), prepared.SelectMany(p => p.Notes).ToList());
+        return new PreparationResult(
+            prepared.Where(p => !p.LeftOut).Select(p => p.Article).ToList(),
+            prepared.SelectMany(p => p.Notes).ToList(),
+            prepared.Where(p => p.LeftOut).Select(p => p.Article.UrlHash).ToList());
     }
 
-    private async Task<(Article Article, List<string> Notes)> PrepareOneAsync(
-        string id, SelectedArticle selected, bool fetchFullText, ImageOptions imageOptions, CancellationToken cancellationToken)
+    private async Task<(Article Article, List<string> Notes, bool LeftOut)> PrepareOneAsync(
+        string id, SelectedArticle selected, bool fetchFullText, bool skipNonArticles, ImageOptions imageOptions, CancellationToken cancellationToken)
     {
         var notes = new List<string>();
         ExtractedPage? page = null;
@@ -59,6 +64,11 @@ public sealed class ArticlePreparationService(PageExtractor extractor, ImageProc
         }
 
         var article = ArticleBuilder.Build(id, selected, page);
+        if (skipNonArticles && article.Page.ClearlyNotArticle)
+        {
+            return (article, [$"“{article.Title}”: left out because the page is not an article."], true);
+        }
+
         if (article.BodySource == BodySource.None)
         {
             notes.Add($"“{article.Title}”: no article text was available, so it will print as a headline only.");
@@ -102,7 +112,7 @@ public sealed class ArticlePreparationService(PageExtractor extractor, ImageProc
         var usableIds = usable.Select(i => i.Id).ToHashSet();
         var blocks = article.Blocks.Where(b => b.Kind != BlockKind.Figure || usableIds.Contains(b.ImageId!)).ToList();
 
-        return (article with { LeadImage = lead, LeadImageCandidates = [], BodyImages = usable, Blocks = blocks }, notes);
+        return (article with { LeadImage = lead, LeadImageCandidates = [], BodyImages = usable, Blocks = blocks }, notes, false);
     }
 
     private async Task<(ArticleImage Image, ArticleImage? Result)[]> ProcessAllAsync(

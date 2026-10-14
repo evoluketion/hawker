@@ -1,10 +1,12 @@
+using AngleSharp.Html.Parser;
 using Microsoft.Extensions.Logging;
 using SmartReader;
 
 namespace Hawker.Core.Articles;
 
 /// <summary>The readable part of an article's web page.</summary>
-public sealed record ExtractedPage(string? ContentHtml, string? Byline, string? FeaturedImage, bool IsReadable);
+/// <param name="Signals">What the page's markup says about whether it is an article.</param>
+public sealed record ExtractedPage(string? ContentHtml, string? Byline, string? FeaturedImage, bool IsReadable, PageSignals? Signals = null);
 
 /// <summary>Fetches an article page and pulls out its main content with SmartReader (a port of Mozilla Readability).</summary>
 public sealed class PageExtractor(HttpClient http, ILogger<PageExtractor> logger)
@@ -48,11 +50,13 @@ public sealed class PageExtractor(HttpClient http, ILogger<PageExtractor> logger
     public static ExtractedPage Parse(string url, string html)
     {
         var article = new Reader(url, html).GetArticle();
+        var signals = PageClassifier.ReadSignals(new HtmlParser().ParseDocument(html), article.PublicationDate);
         return new ExtractedPage(
             NullIfBlank(article.Content),
             NullIfBlank(article.Byline ?? article.Author),
             NullIfBlank(article.FeaturedImage),
-            article.IsReadable);
+            article.IsReadable,
+            signals);
     }
 
     private static string? NullIfBlank(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();

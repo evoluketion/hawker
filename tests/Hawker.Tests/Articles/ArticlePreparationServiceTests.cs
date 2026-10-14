@@ -137,6 +137,37 @@ public class ArticlePreparationServiceTests
         Assert.DoesNotContain(article.Blocks, b => b.Kind == BlockKind.Figure);
     }
 
+    private const string ProductPage = """
+        <html><head><title>Widget Pro</title><meta property="og:type" content="website"></head>
+        <body><main><h1>Widget Pro</h1><p>Meet Widget Pro, the most capable widget we have ever made, with a faster chip, a brighter
+        display and all-day battery life for everything you do.</p><p>Order today and get free delivery on every Widget Pro model,
+        with easy returns and our best trade-in offers.</p><p>Available in five finishes and three sizes, from the compact
+        Widget Pro Mini to the Widget Pro Max.</p></main></body></html>
+        """;
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task A_product_page_is_marked_and_left_out_only_when_the_feed_asks(bool skip)
+    {
+        _http.Html("https://shop.example.com/", ProductPage);
+        var feeds = new Dictionary<int, Feed> { [1] = new Feed { Id = 1, Name = "Feed", Url = "https://feed.example.com/rss", SkipNonArticlePages = skip } };
+
+        var result = await CreateService().PrepareAsync([Selected("https://shop.example.com/", "Widget Pro")], feeds, new ImageOptions());
+
+        if (skip)
+        {
+            Assert.Empty(result.Articles);
+            Assert.Equal([UrlNormalizer.Hash("https://shop.example.com/")], result.LeftOut);
+            Assert.Contains("“Widget Pro”: left out because the page is not an article.", result.Notes);
+        }
+        else
+        {
+            Assert.Equal(new PageClassification(PageKind.NotArticle, true), Assert.Single(result.Articles).Page);
+            Assert.Empty(result.LeftOut);
+        }
+    }
+
     private sealed class StubHandler : HttpMessageHandler
     {
         private readonly Dictionary<string, Func<HttpResponseMessage>> _responses = [];

@@ -1,4 +1,5 @@
 using System.Text.RegularExpressions;
+using Hawker.Core.Feeds;
 using Hawker.Core.Selection;
 
 namespace Hawker.Core.Articles;
@@ -56,7 +57,15 @@ public static partial class ArticleBuilder
             LeadImage = leadCandidates.FirstOrDefault() is { } first ? first with { Id = $"{id}-lead" } : null,
             LeadImageCandidates = leadCandidates,
             BodySource = source,
+            Page = page?.Signals is { } signals ? Classify(item, signals, blocks) : PageClassification.Article,
         };
+    }
+
+    private static PageClassification Classify(FeedItem item, PageSignals signals, List<ArticleBlock> blocks)
+    {
+        var text = blocks.Where(b => b.Kind != BlockKind.Figure).ToList();
+        var opening = string.Join(' ', text.Take(3).Select(b => ArticleHtmlCleaner.PlainText(b.Html)));
+        return PageClassifier.Classify(item.Url, item.Title, signals, text.Where(b => b.Kind == BlockKind.Paragraph).Select(b => b.WordCount), opening);
     }
 
     private static (BodySource Source, CleanedBody? Body) Fullest(List<(BodySource Source, CleanedBody Body)> candidates) =>
