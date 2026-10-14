@@ -89,6 +89,7 @@ Most settings live in the dashboard. A few advanced ones go in `appsettings.json
 |---|---|---|
 | `Hawker:DataDirectory` | see above | Where the database, archive and logs go |
 | `Kestrel:Endpoints:Http:Url` | `http://localhost:5080` | The dashboard address. It only listens on this computer. |
+| `Hawker:OpenDashboardOnStart` | `false` (the start scripts turn it on) | Open the dashboard in your browser once Hawker has started |
 | `Hawker:Pdf:BrowserChannel` | `msedge` on Windows | Use an installed browser, such as `chrome`, for PDF rendering |
 | `Hawker:Pdf:ExecutablePath` | none | Path to a specific Chromium-based browser |
 | `Hawker:Printing:SumatraPath` | bundled `tools\SumatraPDF.exe` | A different SumatraPDF |

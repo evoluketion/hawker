@@ -7,6 +7,7 @@ using Hawker.Core.Selection;
 using Hawker.Web;
 using Hawker.Web.Components;
 using Hawker.Web.Editions;
+using Hawker.Web.Hosting;
 using Hawker.Web.Printing;
 using Hawker.Web.Rendering;
 using Hawker.Web.Settings;
@@ -34,7 +35,12 @@ builder.Services.AddSingleton(paths);
 using var instance = SingleInstance.TryAcquire(paths.DataDirectory);
 if (instance is null)
 {
-    Console.WriteLine($"Hawker is already running (data folder {paths.DataDirectory}). Open {DashboardUrl(builder.Configuration)} to use it.");
+    var url = DashboardUrl.For(builder.Configuration);
+    Console.WriteLine($"Hawker is already running (data folder {paths.DataDirectory}). Open {url} to use it.");
+    if (OpenDashboardOnStart.IsOn(builder.Configuration))
+    {
+        new BrowserLauncher(Microsoft.Extensions.Logging.Abstractions.NullLogger<BrowserLauncher>.Instance).Open(url);
+    }
     return 2;
 }
 
@@ -81,6 +87,8 @@ builder.Services.AddSingleton<RunEvents>();
 builder.Services.AddTransient<EditionRunService>();
 builder.Services.AddHostedService<EditionRunWorker>();
 builder.Services.AddHostedService<EditionScheduler>();
+builder.Services.AddSingleton<IBrowserLauncher, BrowserLauncher>();
+builder.Services.AddHostedService<OpenDashboardOnStart>();
 builder.Services.Configure<PrintingOptions>(builder.Configuration.GetSection("Hawker:Printing"));
 builder.Services.AddSingleton<IProcessRunner, ProcessRunner>();
 if (OperatingSystem.IsWindows())
@@ -144,7 +152,7 @@ catch (Exception ex) when (IsAddressInUse(ex))
 {
     // The port belongs to another program; nothing has been scheduled yet because the scheduler waits for startup.
     // The host (and its logger) is already disposed here, so write straight to the console.
-    Console.Error.WriteLine($"Another program is already using {DashboardUrl(builder.Configuration)}. " +
+    Console.Error.WriteLine($"Another program is already using {DashboardUrl.For(builder.Configuration)}. " +
         "Close it, or set Kestrel:Endpoints:Http:Url to a different address.");
     return 3;
 }
@@ -158,8 +166,6 @@ static bool IsAddressInUse(Exception? ex) => ex switch
     AggregateException aggregate => aggregate.InnerExceptions.Any(IsAddressInUse),
     _ => IsAddressInUse(ex.InnerException),
 };
-
-static string DashboardUrl(IConfiguration configuration) => configuration["Kestrel:Endpoints:Http:Url"] ?? "http://localhost:5080";
 
 static string DefaultDataDirectory() =>
     OperatingSystem.IsWindows()
