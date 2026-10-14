@@ -27,6 +27,12 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- Tray/hawker.png is the one source image for the tray on every platform; hawker.ico exists only because the
+         exe's own icon has to be a .ico. Replace both together. -->
+    <EmbeddedResource Include="Tray\hawker.png" LogicalName="Hawker.Tray.png" />
+  </ItemGroup>
+
+  <ItemGroup>
     <!-- Development settings point the data folder into the repo; never ship them. -->
     <Content Update="appsettings.Development.json" CopyToPublishDirectory="Never" />
   </ItemGroup>
@@ -36,6 +42,7 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <BlazorDisableThrowNavigationException>true</BlazorDisableThrowNavigationException>
+    <ApplicationIcon>hawker.ico</ApplicationIcon>
   </PropertyGroup>
 
 </Project>
