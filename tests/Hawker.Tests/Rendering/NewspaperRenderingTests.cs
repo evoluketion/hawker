@@ -16,8 +16,9 @@ public class NewspaperRenderingTests
 {
     private static readonly DateTimeOffset Now = new(2026, 10, 5, 6, 0, 0, TimeSpan.Zero);
 
-    private static NewspaperModel Model(LayoutPlan plan, IReadOnlyList<Article> articles, PaperSize paper = PaperSize.A4, string name = "The Morning Hawker") =>
-        NewspaperModelBuilder.Build(name, 12, paper, Now, TimeZoneInfo.Utc, plan, articles);
+    private static NewspaperModel Model(LayoutPlan plan, IReadOnlyList<Article> articles, PaperSize paper = PaperSize.A4, string name = "The Morning Hawker",
+        bool qrCodesOnWholeStories = true) =>
+        NewspaperModelBuilder.Build(name, 12, paper, Now, TimeZoneInfo.Utc, plan, articles, qrCodesOnWholeStories);
 
     private static async Task<string> RenderAsync(NewspaperModel model)
     {
@@ -62,6 +63,25 @@ public class NewspaperRenderingTests
         Assert.Contains("<svg", section.Minors.Single().QrSvg);
         Assert.True(section.Majors.Single().Truncated);
         Assert.Contains("<svg", section.Majors.Single().QrSvg);
+    }
+
+    [Fact]
+    public void With_the_setting_off_only_whole_stories_lose_their_qr_code()
+    {
+        Article[] articles = [Make("a1"), Make("a2"), Make("a3", paragraphs: []), Make("a4", paragraphs: [100, 100, 100])];
+        var plan = new LayoutPlan(new LayoutItem("a1", StorySize.Lead, true, null),
+            [new LayoutSection("News", [
+                new LayoutItem("a2", StorySize.Brief, false, 1),
+                new LayoutItem("a3", StorySize.Minor, false, null),
+                new LayoutItem("a4", StorySize.Major, false, 1)])]);
+
+        var model = Model(plan, articles, qrCodesOnWholeStories: false);
+        var section = model.Sections[0];
+
+        Assert.Null(model.Lead.QrSvg);
+        Assert.NotNull(section.Briefs.Single().QrSvg);
+        Assert.NotNull(section.Minors.Single().QrSvg);
+        Assert.NotNull(section.Majors.Single().QrSvg);
     }
 
     [Fact]

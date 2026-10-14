@@ -20,6 +20,7 @@ public sealed class EditionForm
 
     public PaperSize PaperSize { get; set; } = PaperSize.A4;
     public bool Greyscale { get; set; }
+    public bool QrCodesOnWholeStories { get; set; } = true;
     public string? PrinterName { get; set; }
     public string? PaperSource { get; set; }
     public int Copies { get; set; } = 1;
@@ -90,6 +91,7 @@ public sealed class EditionForm
         Schedules = edition.Schedules.Select(ScheduleForm.From).ToList(),
         PaperSize = edition.PaperSize,
         Greyscale = edition.Greyscale,
+        QrCodesOnWholeStories = edition.QrCodesOnWholeStories,
         PrinterName = edition.PrinterName,
         PaperSource = edition.PaperSource,
         Copies = edition.Copies,
@@ -108,6 +110,7 @@ public sealed class EditionForm
         edition.TimeZone = TimeZone;
         edition.PaperSize = PaperSize;
         edition.Greyscale = Greyscale;
+        edition.QrCodesOnWholeStories = QrCodesOnWholeStories;
         edition.PrinterName = string.IsNullOrWhiteSpace(PrinterName) ? null : PrinterName;
         edition.PaperSource = string.IsNullOrWhiteSpace(PaperSource) ? null : PaperSource;
         edition.Copies = Copies;

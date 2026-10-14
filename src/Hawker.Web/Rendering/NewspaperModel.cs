@@ -46,10 +46,11 @@ public static class NewspaperModelBuilder
         DateTimeOffset now,
         TimeZoneInfo timeZone,
         LayoutPlan plan,
-        IReadOnlyList<Article> articles)
+        IReadOnlyList<Article> articles,
+        bool qrCodesOnWholeStories)
     {
         var byId = articles.ToDictionary(a => a.Id);
-        StoryView Story(LayoutItem item) => BuildStory(item, byId[item.ArticleId], timeZone);
+        StoryView Story(LayoutItem item) => BuildStory(item, byId[item.ArticleId], timeZone, qrCodesOnWholeStories);
 
         var sections = plan.Sections
             .Select(s => new SectionView(
@@ -62,7 +63,7 @@ public static class NewspaperModelBuilder
         return new NewspaperModel(editionName, TimeZoneInfo.ConvertTime(now, timeZone), issueNumber, paperSize, Story(plan.Lead), sections);
     }
 
-    private static StoryView BuildStory(LayoutItem item, Article article, TimeZoneInfo timeZone)
+    private static StoryView BuildStory(LayoutItem item, Article article, TimeZoneInfo timeZone, bool qrCodesOnWholeStories)
     {
         var bodyImages = article.BodyImages.ToDictionary(i => i.Id);
         // Body pictures only fit in the wide stories; narrow ones keep just their text.
@@ -99,13 +100,16 @@ public static class NewspaperModelBuilder
             blocks.RemoveAt(blocks.Count - 1);
         }
 
+        // Briefs and headline-only stories print only part of the story (or none), so they always point online.
+        var needsQr = qrCodesOnWholeStories || truncated || item.Size == StorySize.Brief || article.BodySource == BodySource.None;
+
         return new StoryView(
             article,
             item.Size,
             item.ShowImage ? article.LeadImage : null,
             blocks,
             truncated,
-            QrSvg(UrlNormalizer.StripTracking(article.Url)),
+            needsQr ? QrSvg(UrlNormalizer.StripTracking(article.Url)) : null,
             ShortUrl(article.Url),
             MetaLine(article, timeZone));
     }

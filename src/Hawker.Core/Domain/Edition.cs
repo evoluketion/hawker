@@ -22,6 +22,9 @@ public class Edition
     public PaperSize PaperSize { get; set; } = PaperSize.A4;
     public bool Greyscale { get; set; }
 
+    /// <summary>Whether whole stories print a QR code; cut stories, briefs and headline-only stories always do.</summary>
+    public bool QrCodesOnWholeStories { get; set; } = true;
+
     /// <summary>Null means the system default printer.</summary>
     public string? PrinterName { get; set; }
 

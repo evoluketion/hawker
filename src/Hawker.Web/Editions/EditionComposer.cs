@@ -55,7 +55,8 @@ public sealed class EditionComposer(
         var plan = await PlanAsync(edition, prepared.Articles, log, cancellationToken);
 
         var model = NewspaperModelBuilder.Build(
-            edition.Name, issueNumber, edition.PaperSize, time.GetUtcNow(), ResolveTimeZone(edition.TimeZone), plan, prepared.Articles);
+            edition.Name, issueNumber, edition.PaperSize, time.GetUtcNow(), ResolveTimeZone(edition.TimeZone), plan, prepared.Articles,
+            edition.QrCodesOnWholeStories);
         var html = await htmlRenderer.RenderHtmlAsync(model);
         var pdf = await pdfRenderer.RenderAsync(html, edition.Name, edition.PaperSize, cancellationToken);
         log.Add($"Rendered {pdf.Length / 1024:N0} KB PDF.");
