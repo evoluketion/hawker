@@ -6,12 +6,22 @@ public sealed record ValidatedPlan(LayoutPlan Plan, IReadOnlyList<string> Correc
 
 /// <summary>
 /// Makes any proposed plan safe to render: every article appears exactly once, unknown IDs are dropped, there is one
-/// lead, cut points are within the story, and images are only requested where they exist.
+/// lead, cut points are within the story, images are only requested where they exist, and half-width stories are short
+/// enough to fit on one page.
 /// </summary>
 public static class LayoutPlanValidator
 {
     public const string FallbackSectionName = "More news";
     private const int MaxSectionNameLength = 40;
+
+    /// <summary>
+    /// Most words a half-width story may print. An A4 half-width column holds about 470 words a page, or about 390 under a
+    /// lead image; these leave about 10mm spare for font differences between machines.
+    /// </summary>
+    public const int MinorMaxWords = 450;
+
+    /// <inheritdoc cref="MinorMaxWords"/>
+    public const int MinorMaxWordsWithImage = 370;
 
     public static ValidatedPlan Validate(LayoutPlan proposed, IReadOnlyList<Article> articles)
     {
@@ -86,18 +96,22 @@ public static class LayoutPlanValidator
                 .ToList());
         }
 
-        var finalLead = Fix(lead with { Size = StorySize.Lead }, byId[lead.ArticleId]);
+        var finalLead = Fix(lead with { Size = StorySize.Lead }, byId[lead.ArticleId], corrections);
         var finalSections = sections
             .Where(s => s.Items.Count > 0)
             .Select(s => new LayoutSection(s.Name, s.Items
-                .Select(i => Fix(i.Size == StorySize.Lead ? i with { Size = StorySize.Major } : i, byId[i.ArticleId]))
+                .Select(i => Fix(i.Size == StorySize.Lead ? i with { Size = StorySize.Major } : i, byId[i.ArticleId], corrections))
                 .ToList()))
             .ToList();
 
         return new ValidatedPlan(new LayoutPlan(finalLead, finalSections), corrections);
     }
 
-    private static LayoutItem Fix(LayoutItem item, Article article)
+    /// <summary>
+    /// A half-width story taller than a page is set full width, so it can cross the page on its own instead of splitting
+    /// the pair beside it.
+    /// </summary>
+    private static LayoutItem Fix(LayoutItem item, Article article, List<string> corrections)
     {
         var textBlocks = article.Blocks.Count(b => b.Kind != BlockKind.Figure);
         int? keep = item.KeepBlocks;
@@ -112,11 +126,21 @@ public static class LayoutPlanValidator
             keep = k >= textBlocks ? null : Math.Max(1, k);
         }
 
-        return item with
+        var showImage = item.ShowImage && item.Size != StorySize.Brief && article.LeadImage?.DataUri is not null;
+        keep = textBlocks == 0 ? null : keep;
+        var size = item.Size;
+
+        if (size == StorySize.Minor)
         {
-            ShowImage = item.ShowImage && item.Size != StorySize.Brief && article.LeadImage?.DataUri is not null,
-            KeepBlocks = textBlocks == 0 ? null : keep,
-        };
+            var words = article.Blocks.Where(b => b.Kind != BlockKind.Figure).Take(keep ?? textBlocks).Sum(b => b.WordCount);
+            if (words > (showImage ? MinorMaxWordsWithImage : MinorMaxWords))
+            {
+                size = StorySize.Major;
+                corrections.Add($"Widened '{item.ArticleId}' to full width; too long for a half-width column.");
+            }
+        }
+
+        return item with { Size = size, ShowImage = showImage, KeepBlocks = keep };
     }
 
     private static void AddToSection(List<(string Name, List<LayoutItem> Items)> sections, string name, List<LayoutItem> items)

@@ -241,8 +241,12 @@ figcaption {
 .story--minor .lead-image img { max-height: 40mm; }
 .story--minor .body { column-count: 2; }
 
+/* A pair split across a page makes the reader flip back and forth, so each half moves over whole. The validator keeps
+   paired minors shorter than a page, which is what lets the browser honour this. */
+.minors > .story--minor { break-inside: avoid; }
+
 /* An odd one out would leave half a row empty, so it takes the full width instead. */
-.minors > .story--minor:last-child:nth-child(odd) { grid-column: 1 / -1; }
+.minors > .story--minor:last-child:nth-child(odd) { grid-column: 1 / -1; break-inside: auto; }
 .minors > .story--minor:last-child:nth-child(odd) .body { column-count: 3; }
 .minors > .story--minor:last-child:nth-child(odd) .lead-image img { max-height: 50mm; }
 
