@@ -1,0 +1,35 @@
+@using Hawker.Web.Updates
+@implements IDisposable
+@inject UpdateService Updates
+@inject UpdateDialog Dialog
+
+@* The sidebar's update badge; clicking it opens the update dialog (see UpdateNotice). *@
+
+@if (Updates.IsUpdateAvailable || Updates.Status is UpdateStatus.Downloading or UpdateStatus.Restarting)
+{
+    <button class="update-badge" @onclick="Dialog.Open" title="See what's new and install it">
+        @switch (Updates.Status)
+        {
+            case UpdateStatus.Downloading:
+                <span class="update-badge-title">Downloading update</span>
+                <span class="update-badge-sub">@(Updates.Progress is { } p ? $"{p:P0}" : "…")</span>
+                break;
+            case UpdateStatus.Restarting:
+                <span class="update-badge-title">Restarting…</span>
+                <span class="update-badge-sub">This page reloads by itself</span>
+                break;
+            default:
+                <span class="update-badge-title"><span class="update-dot" aria-hidden="true"></span>Update available</span>
+                <span class="update-badge-sub">Hawker @Updates.Latest!.Tag · you have @AppVersion.Display(Updates.CurrentVersion)</span>
+                break;
+        }
+    </button>
+}
+
+@code {
+    protected override void OnInitialized() => Updates.Changed += OnChanged;
+
+    private void OnChanged() => InvokeAsync(StateHasChanged);
+
+    public void Dispose() => Updates.Changed -= OnChanged;
+}

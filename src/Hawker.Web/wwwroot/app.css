@@ -71,6 +71,8 @@ h1:focus { outline: none; }
   position: sticky;
   top: 0;
   height: 100vh;
+  display: flex;
+  flex-direction: column;
 }
 
 .brand { font-family: var(--serif); font-size: 1.7rem; font-weight: 700; letter-spacing: .01em; margin-bottom: .1rem; }
@@ -208,15 +210,23 @@ input[type=time] { max-width: 8rem; }
 
 /* ---------- Updates ---------- */
 
-.topbar { display: flex; justify-content: flex-end; margin: -.75rem 0 .75rem; }
-.update-pill {
-  display: inline-flex; align-items: center; gap: .45rem;
-  font: inherit; font-size: .85rem; color: var(--info);
-  background: var(--info-bg); border: 1px solid color-mix(in srgb, var(--info) 30%, transparent); border-radius: 999px;
-  padding: .3rem .8rem; cursor: pointer;
+/* Sits at the foot of the sidebar. */
+.update-badge {
+  margin-top: auto;
+  display: flex; flex-direction: column; align-items: flex-start; gap: .1rem; width: 100%;
+  font: inherit; text-align: left; color: var(--info);
+  background: var(--info-bg); border: 1px solid color-mix(in srgb, var(--info) 30%, transparent); border-radius: var(--radius);
+  padding: .55rem .7rem; cursor: pointer;
 }
-.update-pill:hover { border-color: var(--info); }
+.update-badge:hover { border-color: var(--info); }
+.update-badge-title { display: inline-flex; align-items: center; gap: .45rem; font-weight: 700; font-size: .88rem; }
+.update-badge-sub { font-size: .78rem; color: var(--ink-soft); }
 .update-dot { width: .5rem; height: .5rem; border-radius: 50%; background: var(--accent); flex: none; }
+
+@media (max-width: 760px) {
+  /* The sidebar is a header on phones, so the badge sits under the menu. */
+  .update-badge { margin-top: .6rem; }
+}
 .release-notes {
   white-space: pre-wrap; overflow-wrap: anywhere; font-size: .88rem;
   max-height: 40vh; overflow-y: auto;

@@ -113,6 +113,7 @@ builder.Services.AddHttpClient(UpdateService.HttpClientName, http =>
     http.DefaultRequestHeaders.UserAgent.ParseAdd($"Hawker/{AppVersion.Display(AppVersion.Current)}");
 });
 builder.Services.AddSingleton<UpdateService>();
+builder.Services.AddScoped<UpdateDialog>();
 builder.Services.AddHostedService<UpdateCheckWorker>();
 builder.Services.AddSingleton<IBrowserLauncher, BrowserLauncher>();
 builder.Services.AddHostedService<OpenDashboardOnStart>();

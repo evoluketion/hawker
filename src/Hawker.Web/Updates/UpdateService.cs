@@ -71,11 +71,6 @@ public sealed class UpdateService(
 
     public bool CheckAutomatically => configuration.GetValue("Hawker:Updates:Check", true);
 
-    /// <summary>Raised to show the update dialog, for example from the settings page.</summary>
-    public event Action? OpenRequested;
-
-    public void RequestOpen() => OpenRequested?.Invoke();
-
     /// <summary>
     /// True once for each new version found, so it is offered as soon as someone opens the dashboard. Never while
     /// developing, where the version number is rarely the released one, and not for a version that just failed to
