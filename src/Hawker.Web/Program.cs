@@ -7,9 +7,13 @@ using Hawker.Core.Selection;
 using Hawker.Web;
 using Hawker.Web.Components;
 using Hawker.Web.Editions;
+using Hawker.Web.Hosting;
 using Hawker.Web.Printing;
 using Hawker.Web.Rendering;
 using Hawker.Web.Settings;
+using Hawker.Web.Tray;
+using Hawker.Web.Tray.Linux;
+using Hawker.Web.Tray.Windows;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Hosting.WindowsServices;
@@ -17,13 +21,19 @@ using Serilog;
 
 var builder = WebApplication.CreateBuilder(new WebApplicationOptions
 {
-    Args = args,
+    Args = Headless.TranslateArgs(args),
     // A published build (which has its own wwwroot) always uses its own folder, wherever it is started from. During
     // development, `dotnet run` uses the project folder.
     ContentRootPath = WindowsServiceHelpers.IsWindowsService() || Directory.Exists(Path.Combine(AppContext.BaseDirectory, "wwwroot"))
         ? AppContext.BaseDirectory
         : null,
 });
+
+// The published Windows exe has no console of its own. A service never needs one, and headless mode must not show one.
+if (OperatingSystem.IsWindows() && !WindowsServiceHelpers.IsWindowsService() && !Headless.IsOn(builder.Configuration))
+{
+    ConsoleWindow.Ensure();
+}
 
 builder.Host.UseWindowsService(o => o.ServiceName = "Hawker");
 builder.Host.UseSystemd();
@@ -34,7 +44,14 @@ builder.Services.AddSingleton(paths);
 using var instance = SingleInstance.TryAcquire(paths.DataDirectory);
 if (instance is null)
 {
-    Console.WriteLine($"Hawker is already running (data folder {paths.DataDirectory}). Open {DashboardUrl(builder.Configuration)} to use it.");
+    var url = DashboardUrl.For(builder.Configuration);
+    StartupNotice.For(builder.Configuration).Show(
+        "Hawker is already running",
+        $"Hawker is already running (data folder {paths.DataDirectory}). Open {url} to use it.");
+    if (OpenDashboardOnStart.IsOn(builder.Configuration))
+    {
+        new BrowserLauncher(Microsoft.Extensions.Logging.Abstractions.NullLogger<BrowserLauncher>.Instance).Open(url);
+    }
     return 2;
 }
 
@@ -81,6 +98,21 @@ builder.Services.AddSingleton<RunEvents>();
 builder.Services.AddTransient<EditionRunService>();
 builder.Services.AddHostedService<EditionRunWorker>();
 builder.Services.AddHostedService<EditionScheduler>();
+builder.Services.AddSingleton<IBrowserLauncher, BrowserLauncher>();
+builder.Services.AddHostedService<OpenDashboardOnStart>();
+builder.Services.AddHostedService<TrayHostedService>();
+if (OperatingSystem.IsWindows())
+{
+    builder.Services.AddSingleton<ITrayIcon, WindowsTrayIcon>();
+}
+else if (OperatingSystem.IsLinux())
+{
+    builder.Services.AddSingleton<ITrayIcon, StatusNotifierTrayIcon>();
+}
+else
+{
+    builder.Services.AddSingleton<ITrayIcon, NullTrayIcon>();
+}
 builder.Services.Configure<PrintingOptions>(builder.Configuration.GetSection("Hawker:Printing"));
 builder.Services.AddSingleton<IProcessRunner, ProcessRunner>();
 if (OperatingSystem.IsWindows())
@@ -144,7 +176,9 @@ catch (Exception ex) when (IsAddressInUse(ex))
 {
     // The port belongs to another program; nothing has been scheduled yet because the scheduler waits for startup.
     // The host (and its logger) is already disposed here, so write straight to the console.
-    Console.Error.WriteLine($"Another program is already using {DashboardUrl(builder.Configuration)}. " +
+    StartupNotice.For(builder.Configuration).Show(
+        "Hawker could not start",
+        $"Another program is already using {DashboardUrl.For(builder.Configuration)}. " +
         "Close it, or set Kestrel:Endpoints:Http:Url to a different address.");
     return 3;
 }
@@ -158,8 +192,6 @@ static bool IsAddressInUse(Exception? ex) => ex switch
     AggregateException aggregate => aggregate.InnerExceptions.Any(IsAddressInUse),
     _ => IsAddressInUse(ex.InnerException),
 };
-
-static string DashboardUrl(IConfiguration configuration) => configuration["Kestrel:Endpoints:Http:Url"] ?? "http://localhost:5080";
 
 static string DefaultDataDirectory() =>
     OperatingSystem.IsWindows()

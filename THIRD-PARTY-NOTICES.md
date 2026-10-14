@@ -28,6 +28,7 @@ Embedded in the newspaper template, all under the [SIL Open Font License 1.1](ht
 | SmartReader | Apache-2.0 |
 | SkiaSharp | MIT |
 | QRCoder | MIT |
+| Tmds.DBus.Protocol | MIT |
 | Cronos | MIT |
 | CronExpressionDescriptor | MIT |
 | Microsoft.EntityFrameworkCore.Sqlite, ASP.NET Core, System.Drawing.Common | MIT |

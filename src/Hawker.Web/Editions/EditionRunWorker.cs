@@ -9,6 +9,7 @@ public sealed class EditionRunWorker(EditionRunQueue queue, IServiceScopeFactory
         {
             await foreach (var request in queue.ReadAllAsync(stoppingToken))
             {
+                queue.SetRunning(true);
                 try
                 {
                     // A fresh scope per run gives each run its own HTTP clients and services.
@@ -19,6 +20,10 @@ public sealed class EditionRunWorker(EditionRunQueue queue, IServiceScopeFactory
                 {
                     // A broken run must never stop the worker; later editions still need printing.
                     logger.LogError(ex, "Run for edition {Edition} could not be completed", request.EditionId);
+                }
+                finally
+                {
+                    queue.SetRunning(false);
                 }
             }
         }

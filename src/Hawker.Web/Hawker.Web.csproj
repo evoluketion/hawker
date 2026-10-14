@@ -16,6 +16,7 @@
     <PackageReference Include="Serilog.AspNetCore" Version="10.0.0" />
     <PackageReference Include="Serilog.Sinks.File" Version="7.0.0" />
     <PackageReference Include="System.Drawing.Common" Version="10.0.12" />
+    <PackageReference Include="Tmds.DBus.Protocol" Version="0.95.1" />
   </ItemGroup>
 
   <ItemGroup>
@@ -24,6 +25,12 @@
     <EmbeddedResource Include="Rendering\newspaper.css" />
     <EmbeddedResource Include="Rendering\Fonts\*.ttf" />
     <None Include="Rendering\Fonts\OFL-*.txt" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Tray/hawker.png is the one source image for the tray on every platform; hawker.ico exists only because the
+         exe's own icon has to be a .ico. Replace both together. -->
+    <EmbeddedResource Include="Tray\hawker.png" LogicalName="Hawker.Tray.png" />
   </ItemGroup>
 
   <ItemGroup>
@@ -36,6 +43,12 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <BlazorDisableThrowNavigationException>true</BlazorDisableThrowNavigationException>
+    <ApplicationIcon>hawker.ico</ApplicationIcon>
+    <!-- The published Windows exe opens no window by itself; ConsoleWindow gives it one outside headless mode.
+         Builds without a runtime identifier (dotnet run, tests) stay console apps. -->
+    <OutputType Condition="$(RuntimeIdentifier.StartsWith('win'))">WinExe</OutputType>
+    <!-- LibraryImport and the fixed-size buffers in the Win32 tray structs need it. -->
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>
 
 </Project>

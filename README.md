@@ -34,8 +34,10 @@ Download the latest release for [Windows](https://github.com/evoluketion/hawker/
 ### Windows
 
 1. Unzip `hawker-win-x64.zip` somewhere permanent, for example `C:\Hawker`.
-2. Double-click **Start Hawker.cmd**. A console window opens and, a few seconds later, the dashboard opens in your browser at <http://localhost:5080>.
+2. Double-click **Start Hawker.cmd**. A console window opens and, once Hawker is ready, the dashboard opens in your browser at <http://localhost:5080>.
 3. Keep the console window open (you can minimise it). Closing it stops Hawker, and papers only print while Hawker is running.
+
+To run Hawker without a console window, double-click **Start Hawker (headless).cmd** instead. Hawker then appears only as an icon in the notification area: click it to open the dashboard, or right-click it and choose **Quit Hawker** to stop it.
 
 ### Linux
 
@@ -47,13 +49,17 @@ cd hawker-<version>-linux-x64
 
 The dashboard opens at <http://localhost:5080>. Press Ctrl+C in the terminal to stop Hawker.
 
+To run Hawker without a terminal, start it with `./start-hawker.sh --headless`. The terminal can then be closed, and Hawker appears only as a tray icon: click it to open the dashboard, or choose **Quit Hawker** from its menu to stop it. KDE Plasma, Xfce, Cinnamon and most other desktops show the icon. Stock GNOME needs the [AppIndicator extension](https://extensions.gnome.org/extension/615/appindicator-support/) for it. Without a tray, Hawker still runs and prints; open the dashboard yourself, and stop Hawker with `pkill Hawker.Web`.
+
 ### First steps in the dashboard
 
 1. **Feeds → Add feed:** paste a feed address and press **Test feed** to see what Hawker reads.
 2. **Editions → New edition:** choose feeds, the number of articles, the look-back range, the schedule and the printer. Then press **Save and preview**.
 3. **Settings:** print a test page. Optionally, add a Claude API key for smarter layouts.
 
-If you start Hawker while it's already running, the second copy exits and the dashboard simply opens.
+If you start Hawker while it's already running, the second copy exits and the dashboard simply opens. In headless mode it shows a notice instead.
+
+If you quit from the tray icon while a paper is being made, Hawker asks first. Quitting stops that paper, and you can print it again from the archive.
 
 ## Printing and failures
 
@@ -90,6 +96,8 @@ Most settings live in the dashboard. A few advanced ones go in `appsettings.json
 |---|---|---|
 | `Hawker:DataDirectory` | see above | Where the database, archive and logs go |
 | `Kestrel:Endpoints:Http:Url` | `http://localhost:5080` | The dashboard address. It only listens on this computer. |
+| `Hawker:Headless` | `false` (`--headless` turns it on) | Run with only a tray icon and no console window. Never opens the browser by itself. |
+| `Hawker:OpenDashboardOnStart` | `false` (the start scripts turn it on) | Open the dashboard in your browser once Hawker has started |
 | `Hawker:Pdf:BrowserChannel` | `msedge` on Windows | Use an installed browser, such as `chrome`, for PDF rendering |
 | `Hawker:Pdf:ExecutablePath` | none | Path to a specific Chromium-based browser |
 | `Hawker:Printing:SumatraPath` | bundled `tools\SumatraPDF.exe` | A different SumatraPDF |
