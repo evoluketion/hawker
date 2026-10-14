@@ -44,6 +44,9 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <BlazorDisableThrowNavigationException>true</BlazorDisableThrowNavigationException>
     <ApplicationIcon>hawker.ico</ApplicationIcon>
+    <!-- The published Windows exe opens no window by itself; ConsoleWindow gives it one outside headless mode.
+         Builds without a runtime identifier (dotnet run, tests) stay console apps. -->
+    <OutputType Condition="$(RuntimeIdentifier.StartsWith('win'))">WinExe</OutputType>
     <!-- LibraryImport and the fixed-size buffers in the Win32 tray structs need it. -->
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>

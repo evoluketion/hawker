@@ -29,6 +29,12 @@ var builder = WebApplication.CreateBuilder(new WebApplicationOptions
         : null,
 });
 
+// The published Windows exe has no console of its own. A service never needs one, and headless mode must not show one.
+if (OperatingSystem.IsWindows() && !WindowsServiceHelpers.IsWindowsService() && !Headless.IsOn(builder.Configuration))
+{
+    ConsoleWindow.Ensure();
+}
+
 builder.Host.UseWindowsService(o => o.ServiceName = "Hawker");
 builder.Host.UseSystemd();
 
@@ -39,7 +45,9 @@ using var instance = SingleInstance.TryAcquire(paths.DataDirectory);
 if (instance is null)
 {
     var url = DashboardUrl.For(builder.Configuration);
-    Console.WriteLine($"Hawker is already running (data folder {paths.DataDirectory}). Open {url} to use it.");
+    StartupNotice.For(builder.Configuration).Show(
+        "Hawker is already running",
+        $"Hawker is already running (data folder {paths.DataDirectory}). Open {url} to use it.");
     if (OpenDashboardOnStart.IsOn(builder.Configuration))
     {
         new BrowserLauncher(Microsoft.Extensions.Logging.Abstractions.NullLogger<BrowserLauncher>.Instance).Open(url);
@@ -168,7 +176,9 @@ catch (Exception ex) when (IsAddressInUse(ex))
 {
     // The port belongs to another program; nothing has been scheduled yet because the scheduler waits for startup.
     // The host (and its logger) is already disposed here, so write straight to the console.
-    Console.Error.WriteLine($"Another program is already using {DashboardUrl.For(builder.Configuration)}. " +
+    StartupNotice.For(builder.Configuration).Show(
+        "Hawker could not start",
+        $"Another program is already using {DashboardUrl.For(builder.Configuration)}. " +
         "Close it, or set Kestrel:Endpoints:Http:Url to a different address.");
     return 3;
 }

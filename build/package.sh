@@ -35,6 +35,7 @@ for rid in "${rids[@]}"; do
     win-*)
       # Batch files need Windows line endings whatever OS builds the package.
       sed 's/\r*$/\r/' "$root/build/scripts/Start Hawker.cmd" > "$out/Start Hawker.cmd"
+      sed 's/\r*$/\r/' "$root/build/scripts/Start Hawker (headless).cmd" > "$out/Start Hawker (headless).cmd"
       echo "==> Adding SumatraPDF $sumatra_version (silent printing on Windows)"
       mkdir -p "$out/tools"
       tmp="$(mktemp -d)"
