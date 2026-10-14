@@ -14,10 +14,17 @@ using Hawker.Web.Settings;
 using Hawker.Web.Tray;
 using Hawker.Web.Tray.Linux;
 using Hawker.Web.Tray.Windows;
+using Hawker.Web.Updates;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Hosting.WindowsServices;
 using Serilog;
+
+// A copy of this program runs this way to install an update in its place.
+if (args is [UpdateApplier.Switch, var planPath])
+{
+    return UpdateApplier.Run(planPath);
+}
 
 var builder = WebApplication.CreateBuilder(new WebApplicationOptions
 {
@@ -98,6 +105,15 @@ builder.Services.AddSingleton<RunEvents>();
 builder.Services.AddTransient<EditionRunService>();
 builder.Services.AddHostedService<EditionRunWorker>();
 builder.Services.AddHostedService<EditionScheduler>();
+builder.Services.AddSingleton(new LaunchArguments(args));
+builder.Services.AddHttpClient(UpdateService.HttpClientName, http =>
+{
+    // Long enough for the download; the release check has its own shorter limit.
+    http.Timeout = TimeSpan.FromMinutes(15);
+    http.DefaultRequestHeaders.UserAgent.ParseAdd($"Hawker/{AppVersion.Display(AppVersion.Current)}");
+});
+builder.Services.AddSingleton<UpdateService>();
+builder.Services.AddHostedService<UpdateCheckWorker>();
 builder.Services.AddSingleton<IBrowserLauncher, BrowserLauncher>();
 builder.Services.AddHostedService<OpenDashboardOnStart>();
 builder.Services.AddHostedService<TrayHostedService>();

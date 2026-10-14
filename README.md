@@ -61,6 +61,14 @@ If you start Hawker while it's already running, the second copy exits and the da
 
 If you quit from the tray icon while a paper is being made, Hawker asks first. Quitting stops that paper, and you can print it again from the archive.
 
+### Updating
+
+Hawker checks GitHub for a new release when it starts and every 6 hours. When there is one, an **Update available** badge appears at the top right of the dashboard, and the first time you open the dashboard it shows what's new. In headless mode, the tray menu offers it too. Nothing is installed until you choose **Install and restart**.
+
+Hawker then downloads the release, restarts into it the same way it was started, and keeps your settings, feeds, `appsettings.json` and printed papers. If the new version doesn't start, the previous one is put back, database included, and the dashboard says what went wrong. A copy started from a Linux terminal comes back headless, because its terminal is gone. The update's log is `updates/update.log` in the data folder.
+
+Hawker installs updates itself when it was started from an unzipped release. When it runs as a Windows service or systemd service, or from source, the dashboard links to the release instead: unpack it over the old folder while Hawker is stopped.
+
 ## Printing and failures
 
 - Double-sided printing flips on the long edge, so stapled papers read like a book. Copies come out as complete sets.
@@ -101,6 +109,7 @@ Most settings live in the dashboard. A few advanced ones go in `appsettings.json
 | `Hawker:Pdf:BrowserChannel` | `msedge` on Windows | Use an installed browser, such as `chrome`, for PDF rendering |
 | `Hawker:Pdf:ExecutablePath` | none | Path to a specific Chromium-based browser |
 | `Hawker:Printing:SumatraPath` | bundled `tools\SumatraPDF.exe` | A different SumatraPDF |
+| `Hawker:Updates:Check` | `true` | Look for new releases. Off, the Settings page can still check when asked. |
 
 ## Troubleshooting
 

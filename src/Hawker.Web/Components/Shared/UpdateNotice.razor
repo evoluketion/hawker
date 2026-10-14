@@ -1,0 +1,146 @@
+@using Hawker.Web.Updates
+@implements IDisposable
+@inject UpdateService Updates
+
+@* The top-right update badge, the update dialog, and how the last update went. *@
+
+@if (Updates.IsUpdateAvailable || Updates.Status is UpdateStatus.Downloading or UpdateStatus.Restarting)
+{
+    <div class="topbar">
+        <button class="update-pill" @onclick="Open" title="See what's new and install it">
+            @switch (Updates.Status)
+            {
+                case UpdateStatus.Downloading:
+                    <span>Downloading update@(Updates.Progress is { } p ? $" {p:P0}" : "…")</span>
+                    break;
+                case UpdateStatus.Restarting:
+                    <span>Restarting…</span>
+                    break;
+                default:
+                    <span class="update-dot" aria-hidden="true"></span>
+                    <span>Update available: <strong>@Updates.Latest!.Tag</strong></span>
+                    break;
+            }
+        </button>
+    </div>
+}
+
+@if (Updates.LastResult is { } result)
+{
+    <div class="alert @(result.Succeeded ? "alert-ok" : "alert-bad") row">
+        <span class="spacer">
+            @if (result.Succeeded)
+            {
+                <text>Hawker was updated from @result.PreviousVersion to <strong>@result.Version</strong>.</text>
+            }
+            else
+            {
+                <text>Updating to @result.Version didn't work, so Hawker went back to @result.PreviousVersion. @result.Error The details are in the update log in the data folder's updates folder.</text>
+            }
+        </span>
+        <button class="btn btn-sm" @onclick="Updates.DismissLastResult">Dismiss</button>
+    </div>
+}
+
+@if (_open && Updates.Latest is { } release)
+{
+    <div class="modal-backdrop" @onclick="Close">
+        <div class="modal modal-wide" role="dialog" aria-modal="true" aria-labelledby="update-title" @onclick:stopPropagation="true">
+            <h2 id="update-title">Hawker @release.Tag is available</h2>
+            <p class="small muted">
+                You have @AppVersion.Display(Updates.CurrentVersion).
+                @if (release.PublishedAt is { } at)
+                {
+                    <text> Released <LocalTime Value="at" />.</text>
+                }
+            </p>
+
+            @if (!string.IsNullOrWhiteSpace(release.Notes))
+            {
+                <div class="release-notes">@release.Notes.Trim()</div>
+            }
+
+            @if (Updates.Status is UpdateStatus.Downloading or UpdateStatus.Restarting)
+            {
+                <div class="alert alert-info">
+                    @Updates.StatusMessage
+                    @if (Updates.Progress is { } progress)
+                    {
+                        <progress max="1" value="@progress.ToString(CultureInfo.InvariantCulture)" style="width:100%;display:block;margin-top:.4rem"></progress>
+                    }
+                </div>
+            }
+            else if (Updates.Status == UpdateStatus.Failed)
+            {
+                <div class="alert alert-bad">@Updates.StatusMessage</div>
+            }
+
+            @if (Updates.Target is null)
+            {
+                <p class="small">@Updates.CannotInstallReason</p>
+                <div class="form-actions">
+                    <a class="btn btn-primary" href="@release.PageUrl" target="_blank" rel="noopener">Open the release page</a>
+                    <button class="btn" @onclick="Close">Close</button>
+                </div>
+            }
+            else
+            {
+                <p class="small muted">Hawker downloads the new version, restarts, and keeps your settings, feeds and printed papers. If the new version doesn't start, the current one comes back.</p>
+                <div class="form-actions">
+                    <button class="btn btn-primary" @onclick="InstallAsync" disabled="@(!Updates.CanInstall)">Install and restart</button>
+                    <button class="btn" @onclick="Close">Later</button>
+                    <a class="btn btn-link" href="@release.PageUrl" target="_blank" rel="noopener">Release page</a>
+                </div>
+            }
+        </div>
+    </div>
+}
+
+@code {
+    private bool _open, _live;
+
+    protected override void OnInitialized()
+    {
+        Updates.Changed += OnChanged;
+        Updates.OpenRequested += OnOpenRequested;
+    }
+
+    // Only a live page takes the prompt; the first, prerendered pass of a page would use it up unseen.
+    protected override void OnAfterRender(bool firstRender)
+    {
+        if (firstRender)
+        {
+            _live = true;
+            if (Updates.TakePrompt())
+            {
+                _open = true;
+                StateHasChanged();
+            }
+        }
+    }
+
+    private void OnChanged() => InvokeAsync(() =>
+    {
+        _open |= _live && Updates.TakePrompt();
+        StateHasChanged();
+    });
+
+    private void OnOpenRequested() => InvokeAsync(() =>
+    {
+        _open = Updates.IsUpdateAvailable;
+        StateHasChanged();
+    });
+
+    private void Open() => _open = true;
+
+    private void Close() => _open = false;
+
+    // Runs on in the background, so the restart goes ahead even if this page is closed.
+    private void InstallAsync() => _ = Updates.InstallAsync();
+
+    public void Dispose()
+    {
+        Updates.Changed -= OnChanged;
+        Updates.OpenRequested -= OnOpenRequested;
+    }
+}

@@ -139,6 +139,16 @@ public sealed class StatusNotifierTrayIcon : ITrayIcon
         }
     }
 
+    public void SetMenu(IReadOnlyList<TrayMenuItem> menu)
+    {
+        lock (_confirmGate)
+        {
+            // A pending second-click confirmation belongs to the old menu.
+            _itemsBeforeConfirm = null;
+            Menu?.Replace(menu, _connection);
+        }
+    }
+
     /// <summary>
     /// Asks with zenity or kdialog. Without either, the clicked item is relabelled for a few seconds and clicking it
     /// again confirms.
