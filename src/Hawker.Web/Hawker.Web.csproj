@@ -43,6 +43,8 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <BlazorDisableThrowNavigationException>true</BlazorDisableThrowNavigationException>
     <ApplicationIcon>hawker.ico</ApplicationIcon>
+    <!-- LibraryImport and the fixed-size buffers in the Win32 tray structs need it. -->
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>
 
 </Project>

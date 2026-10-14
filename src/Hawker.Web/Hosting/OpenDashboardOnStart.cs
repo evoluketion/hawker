@@ -2,14 +2,16 @@ namespace Hawker.Web.Hosting;
 
 /// <summary>
 /// Opens the dashboard once the web server is listening, when <c>Hawker:OpenDashboardOnStart</c> is on. Waiting for
-/// ApplicationStarted means the page never loads before the server can answer it.
+/// ApplicationStarted means the page never loads before the server can answer it. Headless mode never opens it; the
+/// tray menu does instead.
 /// </summary>
 public sealed class OpenDashboardOnStart(
     IConfiguration configuration,
     IBrowserLauncher browser,
     IHostApplicationLifetime lifetime) : IHostedService
 {
-    public static bool IsOn(IConfiguration configuration) => configuration.GetValue<bool>("Hawker:OpenDashboardOnStart");
+    public static bool IsOn(IConfiguration configuration) =>
+        configuration.GetValue<bool>("Hawker:OpenDashboardOnStart") && !Headless.IsOn(configuration);
 
     public Task StartAsync(CancellationToken cancellationToken)
     {

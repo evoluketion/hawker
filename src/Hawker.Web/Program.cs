@@ -11,6 +11,8 @@ using Hawker.Web.Hosting;
 using Hawker.Web.Printing;
 using Hawker.Web.Rendering;
 using Hawker.Web.Settings;
+using Hawker.Web.Tray;
+using Hawker.Web.Tray.Windows;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Hosting.WindowsServices;
@@ -18,7 +20,7 @@ using Serilog;
 
 var builder = WebApplication.CreateBuilder(new WebApplicationOptions
 {
-    Args = args,
+    Args = Headless.TranslateArgs(args),
     // A published build (which has its own wwwroot) always uses its own folder, wherever it is started from. During
     // development, `dotnet run` uses the project folder.
     ContentRootPath = WindowsServiceHelpers.IsWindowsService() || Directory.Exists(Path.Combine(AppContext.BaseDirectory, "wwwroot"))
@@ -89,6 +91,15 @@ builder.Services.AddHostedService<EditionRunWorker>();
 builder.Services.AddHostedService<EditionScheduler>();
 builder.Services.AddSingleton<IBrowserLauncher, BrowserLauncher>();
 builder.Services.AddHostedService<OpenDashboardOnStart>();
+builder.Services.AddHostedService<TrayHostedService>();
+if (OperatingSystem.IsWindows())
+{
+    builder.Services.AddSingleton<ITrayIcon, WindowsTrayIcon>();
+}
+else
+{
+    builder.Services.AddSingleton<ITrayIcon, NullTrayIcon>();
+}
 builder.Services.Configure<PrintingOptions>(builder.Configuration.GetSection("Hawker:Printing"));
 builder.Services.AddSingleton<IProcessRunner, ProcessRunner>();
 if (OperatingSystem.IsWindows())
