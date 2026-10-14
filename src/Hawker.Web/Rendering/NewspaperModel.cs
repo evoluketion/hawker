@@ -98,16 +98,13 @@ public static class NewspaperModelBuilder
             blocks.RemoveAt(blocks.Count - 1);
         }
 
-        // Briefs and headline-only stories always point online, since they print only part of the story (or none).
-        var needsQr = truncated || item.Size == StorySize.Brief || article.BodySource == BodySource.None;
-
         return new StoryView(
             article,
             item.Size,
             item.ShowImage ? article.LeadImage : null,
             blocks,
             truncated,
-            needsQr ? QrSvg(article.Url) : null,
+            QrSvg(article.Url),
             ShortUrl(article.Url),
             MetaLine(article, timeZone));
     }
@@ -153,7 +150,7 @@ public static class NewspaperModelBuilder
         return shortUrl.Length <= 48 ? shortUrl : shortUrl[..47] + "…";
     }
 
-    private static string QrSvg(string url)
+    public static string QrSvg(string url)
     {
         using var generator = new QRCodeGenerator();
         using var data = generator.CreateQrCode(url, QRCodeGenerator.ECCLevel.M);
