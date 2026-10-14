@@ -6,6 +6,8 @@
 @inject IPrintService Printers
 @inject TestPagePrinter TestPage
 @inject HawkerPaths Paths
+@inject Hawker.Web.Updates.UpdateService Updates
+@implements IDisposable
 
 <PageTitle>Settings · Hawker</PageTitle>
 
@@ -166,12 +168,49 @@
     </div>
 
     <div class="card">
+        <h2>Updates</h2>
+        <p>
+            You have Hawker <strong>@Hawker.Web.Updates.AppVersion.Display(Updates.CurrentVersion)</strong>.
+            @if (Updates.IsUpdateAvailable)
+            {
+                <span class="badge badge-info">@Updates.Latest!.Tag is available</span>
+            }
+            else if (Updates.LastChecked is not null && Updates.CheckError is null)
+            {
+                <span class="badge badge-ok">Up to date</span>
+            }
+        </p>
+        @if (Updates.CheckError is { } checkError)
+        {
+            <div class="alert alert-warn">Couldn't check for updates: @checkError</div>
+        }
+        <p class="small muted">
+            @(Updates.CheckAutomatically
+                ? "Hawker looks for a new release when it starts and every 6 hours, and asks before installing anything."
+                : "Automatic checks are off (Hawker:Updates:Check in appsettings.json).")
+            @if (Updates.LastChecked is { } checkedAt)
+            {
+                <text> Last checked <LocalTime Value="checkedAt" />.</text>
+            }
+        </p>
+        <div class="row">
+            @if (Updates.IsUpdateAvailable)
+            {
+                <button class="btn btn-primary" @onclick="Updates.RequestOpen">See what's new</button>
+            }
+            <button class="btn" @onclick="CheckForUpdatesAsync" disabled="@(Updates.Status == Hawker.Web.Updates.UpdateStatus.Checking)">
+                @(Updates.Status == Hawker.Web.Updates.UpdateStatus.Checking ? "Checking…" : "Check now")
+            </button>
+        </div>
+    </div>
+
+    <div class="card">
         <h2>About this installation</h2>
         <dl class="small" style="display:grid;grid-template-columns:auto 1fr;gap:.3rem 1rem;margin:0">
             <dt class="muted">Data folder</dt><dd class="mono" style="margin:0;word-break:break-all">@Paths.DataDirectory</dd>
             <dt class="muted">Archive</dt><dd class="mono" style="margin:0;word-break:break-all">@Paths.ArchiveDirectory</dd>
             <dt class="muted">Logs</dt><dd class="mono" style="margin:0;word-break:break-all">@Paths.LogDirectory</dd>
-            <dt class="muted">Version</dt><dd style="margin:0">@typeof(Settings).Assembly.GetName().Version</dd>
+            <dt class="muted">Version</dt><dd style="margin:0">@Hawker.Web.Updates.AppVersion.Display(Updates.CurrentVersion)</dd>
         </dl>
     </div>
 </div>
@@ -210,6 +249,7 @@
 
     protected override async Task OnInitializedAsync()
     {
+        Updates.Changed += OnUpdatesChanged;
         await LoadClaudeAsync();
         _general = await General.GetAsync();
         (_retries, _retryDelay, _grace) = (_general.PrintRetryCount, _general.PrintRetryDelaySeconds, _general.MissedRunGraceMinutes);
@@ -343,4 +383,10 @@
             _generalSaved = true;
         }
     }
+
+    private Task CheckForUpdatesAsync() => Updates.CheckAsync();
+
+    private void OnUpdatesChanged() => InvokeAsync(StateHasChanged);
+
+    public void Dispose() => Updates.Changed -= OnUpdatesChanged;
 }

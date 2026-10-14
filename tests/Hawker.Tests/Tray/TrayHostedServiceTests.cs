@@ -1,18 +1,20 @@
 using Hawker.Web.Editions;
 using Hawker.Web.Hosting;
 using Hawker.Web.Tray;
+using Hawker.Tests.Updates;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Hawker.Tests.Tray;
 
-public sealed class TrayHostedServiceTests
+public sealed class TrayHostedServiceTests : IDisposable
 {
     private readonly FakeTray _tray = new();
     private readonly FakeBrowser _browser = new();
     private readonly FakeLifetime _lifetime = new();
     private readonly EditionRunQueue _runs = new();
+    private readonly UpdateFixture _updates = new(_ => UpdateFixture.Json(UpdateFixture.Release("0.0.1")));
 
     [Fact]
     public async Task Shows_nothing_unless_headless()
@@ -43,6 +45,22 @@ public sealed class TrayHostedServiceTests
         _tray.OnActivate!();
 
         Assert.Equal(["http://localhost:6000", "http://localhost:6000"], _browser.Opened);
+    }
+
+    [Fact]
+    public async Task A_newer_release_adds_an_update_entry_that_opens_its_page_when_it_cant_install_itself()
+    {
+        await Service(Config(("Hawker:Headless", "true"))).StartAsync(CancellationToken.None);
+        Assert.Equal(4, _tray.Menu!.Count);
+
+        _updates.Respond = _ => UpdateFixture.Json(UpdateFixture.Release("v99.1.0"));
+        await _updates.Service.CheckAsync();
+
+        // Tests run under dotnet, which is never an installable copy.
+        Assert.Equal(["Open dashboard", "Update v99.1.0 available…", "", "Quit Hawker"], _tray.Menu.Skip(1).Select(i => i.Text));
+        _tray.Menu[2].OnClick!();
+        Assert.Equal(["https://github.com/evoluketion/hawker/releases/tag/v99.1.0"], _browser.Opened);
+        Assert.Equal(0, _tray.Questions);
     }
 
     [Fact]
@@ -132,7 +150,9 @@ public sealed class TrayHostedServiceTests
     }
 
     private TrayHostedService Service(IConfiguration config) =>
-        new(_tray, _runs, config, _browser, _lifetime, NullLogger<TrayHostedService>.Instance);
+        new(_tray, _runs, _updates.Service, config, _browser, _lifetime, NullLogger<TrayHostedService>.Instance);
+
+    public void Dispose() => _updates.Dispose();
 
     private static IConfiguration Config(params (string Key, string Value)[] values) =>
         new ConfigurationBuilder()
@@ -153,6 +173,8 @@ public sealed class TrayHostedServiceTests
             Questions++;
             return Answer;
         }
+
+        public void SetMenu(IReadOnlyList<TrayMenuItem> menu) => Menu = menu;
 
         public bool Show(string tooltip, IReadOnlyList<TrayMenuItem> menu, Action onActivate)
         {

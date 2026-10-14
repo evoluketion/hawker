@@ -53,6 +53,14 @@ public sealed unsafe class WindowsTrayIcon(ILogger<WindowsTrayIcon> logger) : IT
         return shown.Task.GetAwaiter().GetResult();
     }
 
+    public void SetMenu(IReadOnlyList<TrayMenuItem> menu)
+    {
+        lock (_gate)
+        {
+            _menu = menu;
+        }
+    }
+
     /// <summary>Shown from the calling thread with no owner window; the menu click has just made Hawker foreground.</summary>
     public bool Confirm(string title, string message, string confirmLabel) =>
         MessageBox(0, message, title, MB_YESNO | MB_ICONWARNING | MB_TOPMOST | MB_SETFOREGROUND) == IDYES;
@@ -216,12 +224,18 @@ public sealed unsafe class WindowsTrayIcon(ILogger<WindowsTrayIcon> logger) : IT
 
     private void ShowMenu(nint hwnd, int x, int y)
     {
+        IReadOnlyList<TrayMenuItem> items;
+        lock (_gate)
+        {
+            items = _menu;
+        }
+
         var menu = CreatePopupMenu();
         try
         {
-            for (var i = 0; i < _menu.Count; i++)
+            for (var i = 0; i < items.Count; i++)
             {
-                var item = _menu[i];
+                var item = items[i];
                 if (item.IsSeparator)
                 {
                     AppendMenu(menu, MF_SEPARATOR, 0, null);
@@ -239,7 +253,7 @@ public sealed unsafe class WindowsTrayIcon(ILogger<WindowsTrayIcon> logger) : IT
             var command = TrackPopupMenuEx(menu, TPM_RIGHTBUTTON | TPM_RETURNCMD | TPM_NONOTIFY, x, y, hwnd, 0);
             PostMessage(hwnd, WM_NULL, 0, 0);
 
-            if (command > 0 && _menu[command - 1].OnClick is { } onClick)
+            if (command > 0 && items[command - 1].OnClick is { } onClick)
             {
                 Dispatch(onClick);
             }
