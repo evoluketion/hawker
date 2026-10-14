@@ -14,4 +14,10 @@ public interface ITrayIcon : IDisposable
     /// <param name="onActivate">The icon's primary click. Runs on a thread-pool thread.</param>
     /// <returns>False when the desktop has no tray to show it in.</returns>
     bool Show(string tooltip, IReadOnlyList<TrayMenuItem> menu, Action onActivate);
+
+    /// <summary>Asks a yes/no question. Called from a menu item's handler, and blocks until answered.</summary>
+    /// <param name="confirmLabel">
+    /// Where no dialog can be shown, the clicked menu item briefly takes this label and a second click confirms.
+    /// </param>
+    bool Confirm(string title, string message, string confirmLabel);
 }

@@ -29,6 +29,10 @@ public sealed class DbusMenu(IReadOnlyList<TrayMenuItem> items, Action<Action> d
 
     public uint Revision => _revision;
 
+    public IReadOnlyList<TrayMenuItem> Items => _items;
+
+    public int? LastClicked { get; private set; }
+
     public IReadOnlyList<int> ChildIds => Enumerable.Range(1, _items.Count).ToList();
 
     /// <returns>The item's dbusmenu properties, or null for an unknown id.</returns>
@@ -60,6 +64,7 @@ public sealed class DbusMenu(IReadOnlyList<TrayMenuItem> items, Action<Action> d
 
         if (_items[id - 1] is { Enabled: true, OnClick: { } onClick })
         {
+            LastClicked = id;
             dispatch(onClick);
         }
 

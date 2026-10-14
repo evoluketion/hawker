@@ -10,6 +10,12 @@ public sealed record RunRequest(int EditionId, RunTrigger Trigger, DateTimeOffse
 public sealed class EditionRunQueue
 {
     private readonly Channel<RunRequest> _channel = Channel.CreateUnbounded<RunRequest>(new UnboundedChannelOptions { SingleReader = true });
+    private volatile bool _isRunning;
+
+    /// <summary>True while a run is being built or printed.</summary>
+    public bool IsRunning => _isRunning;
+
+    public void SetRunning(bool running) => _isRunning = running;
 
     public void Enqueue(RunRequest request) => _channel.Writer.TryWrite(request);
 

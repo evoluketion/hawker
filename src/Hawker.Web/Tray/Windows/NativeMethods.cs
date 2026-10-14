@@ -30,6 +30,12 @@ internal static unsafe partial class NativeMethods
     public const uint TPM_NONOTIFY = 0x0080;
     public const uint TPM_RETURNCMD = 0x0100;
 
+    public const uint MB_YESNO = 0x0004;
+    public const uint MB_ICONWARNING = 0x0030;
+    public const uint MB_SETFOREGROUND = 0x00010000;
+    public const uint MB_TOPMOST = 0x00040000;
+    public const int IDYES = 6;
+
     public const int SM_CXSMICON = 49;
     public const uint MSGFLT_ALLOW = 1;
 
@@ -191,6 +197,9 @@ internal static unsafe partial class NativeMethods
     [LibraryImport("gdi32.dll")]
     [return: MarshalAs(UnmanagedType.Bool)]
     public static partial bool DeleteObject(nint obj);
+
+    [LibraryImport("user32.dll", EntryPoint = "MessageBoxW", StringMarshalling = StringMarshalling.Utf16)]
+    public static partial int MessageBox(nint hwnd, string text, string caption, uint type);
 
     [LibraryImport("shell32.dll", EntryPoint = "Shell_NotifyIconW")]
     [return: MarshalAs(UnmanagedType.Bool)]

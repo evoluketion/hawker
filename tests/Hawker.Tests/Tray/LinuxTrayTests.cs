@@ -64,6 +64,45 @@ public sealed class LinuxTrayTests
         Assert.False(tray.Show("Hawker", [], () => { }));
     }
 
+    [Theory]
+    [InlineData(0, true)]
+    [InlineData(1, false)]
+    public void Confirm_takes_the_dialog_answer(int exitCode, bool expected)
+    {
+        var asked = new List<string>();
+        using var tray = Tray((tool, _) =>
+        {
+            asked.Add(tool);
+            return exitCode;
+        });
+
+        Assert.Equal(expected, tray.Confirm("Quit Hawker?", "Sure?", "Quit anyway"));
+        Assert.Equal(["zenity"], asked);
+    }
+
+    [Fact]
+    public void Confirm_falls_back_to_kdialog_without_zenity()
+    {
+        using var tray = Tray((tool, _) => tool == "kdialog" ? 0 : null);
+
+        Assert.True(tray.Confirm("Quit Hawker?", "Sure?", "Quit anyway"));
+    }
+
+    [Fact]
+    public void Without_a_dialog_tool_a_second_click_confirms()
+    {
+        using var tray = Tray((_, _) => null);
+        tray.Show("Hawker", [new TrayMenuItem("Open", () => { }), new TrayMenuItem("Quit Hawker", () => { })], () => { });
+        tray.Menu!.Click(2);
+
+        Assert.False(tray.Confirm("Quit Hawker?", "Sure?", "Quit anyway"));
+        Assert.Equal("Quit anyway", tray.Menu.Properties(2)!["label"]);
+        Assert.Equal("Open", tray.Menu.Properties(1)!["label"]);
+
+        Assert.True(tray.Confirm("Quit Hawker?", "Sure?", "Quit anyway"));
+        Assert.Equal("Quit Hawker", tray.Menu.Properties(2)!["label"]);
+    }
+
     [Fact]
     [Trait("Category", "System")]
     public void Without_a_watcher_on_the_bus_there_is_no_tray()
@@ -98,6 +137,9 @@ public sealed class LinuxTrayTests
             new TrayMenuItem("Quit Hawker", () => _clicked.Add("quit")),
         ],
         action => action());
+
+    private static StatusNotifierTrayIcon Tray(Func<string, IReadOnlyList<string>, int?> runDialog) =>
+        new(NullLogger<StatusNotifierTrayIcon>.Instance, busAddress: null, StatusNotifierTrayIcon.DefaultWatcherName) { RunDialog = runDialog };
 
     private static string UniqueWatcherName() => $"org.hawker.Test.Watcher{Guid.NewGuid():N}";
 

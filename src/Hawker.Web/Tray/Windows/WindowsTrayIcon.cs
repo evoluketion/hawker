@@ -53,6 +53,10 @@ public sealed unsafe class WindowsTrayIcon(ILogger<WindowsTrayIcon> logger) : IT
         return shown.Task.GetAwaiter().GetResult();
     }
 
+    /// <summary>Shown from the calling thread with no owner window; the menu click has just made Hawker foreground.</summary>
+    public bool Confirm(string title, string message, string confirmLabel) =>
+        MessageBox(0, message, title, MB_YESNO | MB_ICONWARNING | MB_TOPMOST | MB_SETFOREGROUND) == IDYES;
+
     public void Dispose()
     {
         Thread? thread;

@@ -1,3 +1,4 @@
+using Hawker.Web.Editions;
 using Hawker.Web.Hosting;
 
 namespace Hawker.Web.Tray;
@@ -8,6 +9,7 @@ namespace Hawker.Web.Tray;
 /// </summary>
 public sealed class TrayHostedService(
     ITrayIcon tray,
+    EditionRunQueue runs,
     IConfiguration configuration,
     IBrowserLauncher browser,
     IHostApplicationLifetime lifetime,
@@ -34,7 +36,7 @@ public sealed class TrayHostedService(
         new($"Hawker {Version}", null, Enabled: false),
         new("Open dashboard", OpenDashboard),
         TrayMenuItem.Separator,
-        new("Quit Hawker", lifetime.StopApplication),
+        new("Quit Hawker", Quit),
     ];
 
     private static string Version => typeof(TrayHostedService).Assembly.GetName().Version?.ToString(3) ?? "";
@@ -52,6 +54,20 @@ public sealed class TrayHostedService(
         {
             logger.LogWarning(ex, "Could not show the tray icon. Hawker keeps running; open {Url} to use it", DashboardUrl.For(configuration));
         }
+    }
+
+    /// <summary>Quitting mid-run abandons that paper, so it needs a yes first.</summary>
+    private void Quit()
+    {
+        if (runs.IsRunning && !tray.Confirm(
+                "Quit Hawker?",
+                "A paper is being made. Quit anyway? It will be stopped and can be printed again from the archive.",
+                "Quit anyway (a paper is being made)"))
+        {
+            return;
+        }
+
+        lifetime.StopApplication();
     }
 
     private void OpenDashboard() => browser.Open(DashboardUrl.For(configuration));

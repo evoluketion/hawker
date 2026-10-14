@@ -1,3 +1,4 @@
+using Hawker.Web.Editions;
 using Hawker.Web.Hosting;
 using Hawker.Web.Tray;
 using Microsoft.Extensions.Configuration;
@@ -11,6 +12,7 @@ public sealed class TrayHostedServiceTests
     private readonly FakeTray _tray = new();
     private readonly FakeBrowser _browser = new();
     private readonly FakeLifetime _lifetime = new();
+    private readonly EditionRunQueue _runs = new();
 
     [Fact]
     public async Task Shows_nothing_unless_headless()
@@ -50,6 +52,32 @@ public sealed class TrayHostedServiceTests
 
         _tray.Menu![3].OnClick!();
 
+        Assert.True(_lifetime.Stopped);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Quit_mid_run_asks_first_and_stops_only_on_yes(bool answer)
+    {
+        await Service(Config(("Hawker:Headless", "true"))).StartAsync(CancellationToken.None);
+        _runs.SetRunning(true);
+        _tray.Answer = answer;
+
+        _tray.Menu![3].OnClick!();
+
+        Assert.Equal(1, _tray.Questions);
+        Assert.Equal(answer, _lifetime.Stopped);
+    }
+
+    [Fact]
+    public async Task Quit_while_idle_does_not_ask()
+    {
+        await Service(Config(("Hawker:Headless", "true"))).StartAsync(CancellationToken.None);
+
+        _tray.Menu![3].OnClick!();
+
+        Assert.Equal(0, _tray.Questions);
         Assert.True(_lifetime.Stopped);
     }
 
@@ -104,7 +132,7 @@ public sealed class TrayHostedServiceTests
     }
 
     private TrayHostedService Service(IConfiguration config) =>
-        new(_tray, config, _browser, _lifetime, NullLogger<TrayHostedService>.Instance);
+        new(_tray, _runs, config, _browser, _lifetime, NullLogger<TrayHostedService>.Instance);
 
     private static IConfiguration Config(params (string Key, string Value)[] values) =>
         new ConfigurationBuilder()
@@ -117,6 +145,14 @@ public sealed class TrayHostedServiceTests
         public IReadOnlyList<TrayMenuItem>? Menu { get; private set; }
         public Action? OnActivate { get; private set; }
         public bool Disposed { get; private set; }
+        public bool Answer { get; set; }
+        public int Questions { get; private set; }
+
+        public bool Confirm(string title, string message, string confirmLabel)
+        {
+            Questions++;
+            return Answer;
+        }
 
         public bool Show(string tooltip, IReadOnlyList<TrayMenuItem> menu, Action onActivate)
         {

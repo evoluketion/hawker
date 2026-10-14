@@ -1,3 +1,5 @@
+using System.ComponentModel;
+using System.Diagnostics;
 using Tmds.DBus.Protocol;
 
 namespace Hawker.Web.Tray.Linux;
@@ -12,6 +14,7 @@ public sealed class StatusNotifierTrayIcon : ITrayIcon
     private const string ItemPath = "/StatusNotifierItem";
     private const string ItemInterface = "org.kde.StatusNotifierItem";
     private static readonly int[] IconSizes = [22, 32, 48];
+    private static readonly TimeSpan ConfirmWindow = TimeSpan.FromSeconds(10);
 
     private readonly ILogger<StatusNotifierTrayIcon> _logger;
     private readonly string? _busAddress;
@@ -21,6 +24,9 @@ public sealed class StatusNotifierTrayIcon : ITrayIcon
     private NameOwnerWatcher? _watcher;
     private string _serviceName = "";
     private bool _disposed;
+    private readonly Lock _confirmGate = new();
+    private IReadOnlyList<TrayMenuItem>? _itemsBeforeConfirm;
+    private int _confirmGeneration;
 
     public StatusNotifierTrayIcon(ILogger<StatusNotifierTrayIcon> logger)
         : this(logger, DBusAddress.Session, DefaultWatcherName)
@@ -38,12 +44,16 @@ public sealed class StatusNotifierTrayIcon : ITrayIcon
 
     public DbusMenu? Menu { get; private set; }
 
+    /// <summary>Runs a dialog tool and returns its exit code, or null when the tool isn't installed.</summary>
+    public Func<string, IReadOnlyList<string>, int?> RunDialog { get; init; } = RunDialogProcess;
+
     public bool Show(string tooltip, IReadOnlyList<TrayMenuItem> menu, Action onActivate) =>
         ShowAsync(tooltip, menu, onActivate).GetAwaiter().GetResult();
 
     private async Task<bool> ShowAsync(string tooltip, IReadOnlyList<TrayMenuItem> menu, Action onActivate)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
+        Menu = new DbusMenu(menu, Dispatch);
         if (string.IsNullOrEmpty(_busAddress))
         {
             _logger.LogInformation("There is no D-Bus session bus, so no tray icon can be shown");
@@ -53,7 +63,6 @@ public sealed class StatusNotifierTrayIcon : ITrayIcon
         _connection = new DBusConnection(_busAddress);
         await _connection.ConnectAsync();
 
-        Menu = new DbusMenu(menu, Dispatch);
         _connection.AddMethodHandlers([new Item(this, tooltip, onActivate), Menu]);
 
         // The spec's naming scheme, so hosts that expect a well-known name find one.
@@ -127,6 +136,100 @@ public sealed class StatusNotifierTrayIcon : ITrayIcon
         {
             _logger.LogWarning(ex, "The tray host refused Hawker's icon");
             return false;
+        }
+    }
+
+    /// <summary>
+    /// Asks with zenity or kdialog. Without either, the clicked item is relabelled for a few seconds and clicking it
+    /// again confirms.
+    /// </summary>
+    public bool Confirm(string title, string message, string confirmLabel)
+    {
+        lock (_confirmGate)
+        {
+            if (_itemsBeforeConfirm is not null)
+            {
+                RestoreMenu();
+                return true;
+            }
+        }
+
+        (string Tool, string[] Args)[] dialogs =
+        [
+            ("zenity", ["--question", "--title", title, "--text", message]),
+            ("kdialog", ["--title", title, "--warningyesno", message]),
+        ];
+        foreach (var (tool, args) in dialogs)
+        {
+            // Both answer 0 for yes and 1 for no; any other code means the dialog couldn't be shown.
+            switch (RunDialog(tool, args))
+            {
+                case 0:
+                    return true;
+                case 1:
+                    return false;
+            }
+        }
+
+        AskForSecondClick(confirmLabel);
+        return false;
+    }
+
+    private void AskForSecondClick(string confirmLabel)
+    {
+        if (Menu is not { LastClicked: { } id } menu)
+        {
+            return;
+        }
+
+        int generation;
+        lock (_confirmGate)
+        {
+            _itemsBeforeConfirm = menu.Items;
+            generation = ++_confirmGeneration;
+            menu.Replace(menu.Items.Select((item, i) => i == id - 1 ? item with { Text = confirmLabel } : item).ToList(), _connection);
+        }
+
+        _ = Task.Delay(ConfirmWindow).ContinueWith(_ =>
+        {
+            lock (_confirmGate)
+            {
+                if (_confirmGeneration == generation && _itemsBeforeConfirm is not null)
+                {
+                    RestoreMenu();
+                }
+            }
+        }, TaskScheduler.Default);
+    }
+
+    private void RestoreMenu()
+    {
+        Menu!.Replace(_itemsBeforeConfirm!, _connection);
+        _itemsBeforeConfirm = null;
+    }
+
+    private static int? RunDialogProcess(string tool, IReadOnlyList<string> args)
+    {
+        var startInfo = new ProcessStartInfo(tool) { UseShellExecute = false };
+        foreach (var arg in args)
+        {
+            startInfo.ArgumentList.Add(arg);
+        }
+
+        try
+        {
+            using var process = Process.Start(startInfo);
+            if (process is null)
+            {
+                return null;
+            }
+
+            process.WaitForExit();
+            return process.ExitCode;
+        }
+        catch (Win32Exception)
+        {
+            return null;
         }
     }
 
