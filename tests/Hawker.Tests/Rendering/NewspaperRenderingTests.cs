@@ -176,6 +176,84 @@ public class NewspaperRenderingTests
         }
     }
 
+    [Fact]
+    [Trait("Category", "Browser")]
+    public async Task Side_by_side_stories_fit_on_one_page_and_move_over_whole()
+    {
+        Article[] articles =
+        [
+            Prose("lead", 300, image: true),
+            Prose("tall-pictured", LayoutPlanValidator.MinorMaxWordsWithImage, image: true),
+            Prose("tall-plain", LayoutPlanValidator.MinorMaxWords, image: false),
+            Prose("very-long", 2000, image: false),
+        ];
+        var proposed = new LayoutPlan(new LayoutItem("lead", StorySize.Lead, true, null),
+            [new LayoutSection("World", articles.Skip(1).Select(a => new LayoutItem(a.Id, StorySize.Minor, true, null)).ToList())]);
+        var html = await RenderAsync(Model(LayoutPlanValidator.Validate(proposed, articles).Plan, articles));
+
+        using var playwright = await Microsoft.Playwright.Playwright.CreateAsync();
+        await using var browser = await playwright.Chromium.LaunchAsync(new() { Headless = true });
+        var page = await browser.NewPageAsync();
+        await page.SetViewportSizeAsync((int)Math.Floor(PdfRenderer.ContentWidthMm(PaperSize.A4) * 96 / 25.4), 1000);
+        await page.EmulateMediaAsync(new() { Media = Microsoft.Playwright.Media.Print });
+        await page.SetContentAsync(html);
+        var stories = await page.EvaluateAsync<RenderedStory[]>("""
+            () => [...document.querySelectorAll('.story--minor, .story--major')].map(s => ({
+              id: s.querySelector('.headline').textContent.trim(),
+              size: s.classList.contains('story--major') ? 'major' : 'minor',
+              breakInside: getComputedStyle(s).breakInside,
+              heightMm: s.getBoundingClientRect().height * 25.4 / 96,
+            }))
+            """);
+
+        Assert.Equal("major", stories.Single(s => s.Id == "Headline very-long").Size);
+        var pair = stories.Where(s => s.Size == "minor").ToList();
+        Assert.Equal(["Headline tall-pictured", "Headline tall-plain"], pair.Select(s => s.Id));
+        const double pageContentMm = 297 - 10 - 13;
+        Assert.All(pair, s =>
+        {
+            Assert.Equal("avoid", s.BreakInside);
+            Assert.True(s.HeightMm <= pageContentMm, $"{s.Id} is {s.HeightMm:F0}mm tall");
+        });
+    }
+
+    /// <summary>An article of ordinary-looking prose, since word lengths decide how tall a column runs.</summary>
+    private static Article Prose(string id, int words, bool image)
+    {
+        string[] vocabulary =
+        [
+            "the", "government", "said", "on", "Tuesday", "that", "it", "would", "review", "plans", "for", "a", "new",
+            "railway", "line", "between", "northern", "cities", "after", "months", "of", "delays", "and", "rising",
+            "costs", "officials", "expect", "construction", "to", "begin", "next", "year", "although", "critics",
+            "remain", "unconvinced", "by", "the", "projected", "benefits", "in", "local", "communities",
+        ];
+        var random = new Random(words);
+        var paragraphs = new List<ArticleBlock>();
+        for (var left = words; left > 0; left -= 60)
+        {
+            var count = Math.Min(60, left);
+            var text = string.Join(' ', Enumerable.Range(0, count).Select(_ => vocabulary[random.Next(vocabulary.Length)]));
+            paragraphs.Add(new ArticleBlock(BlockKind.Paragraph, $"<p>{text}.</p>", count));
+        }
+
+        // 1200×800, the 3:2 shape of a typical news photo.
+        var photo = "data:image/svg+xml;base64," + Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(
+            "<svg xmlns='http://www.w3.org/2000/svg' width='1200' height='800'><rect width='1200' height='800' fill='#888'/></svg>"));
+        return Make(id, image: image, title: $"Headline {id}") with
+        {
+            Blocks = paragraphs,
+            LeadImage = image ? new ArticleImage { Id = $"{id}-lead", SourceUrl = $"https://cdn.example.com/{id}.jpg", DataUri = photo, Width = 1200, Height = 800 } : null,
+        };
+    }
+
+    private sealed class RenderedStory
+    {
+        public string Id { get; set; } = "";
+        public string Size { get; set; } = "";
+        public string BreakInside { get; set; } = "";
+        public double HeightMm { get; set; }
+    }
+
     private sealed class MastheadFit
     {
         public double FontPt { get; set; }
