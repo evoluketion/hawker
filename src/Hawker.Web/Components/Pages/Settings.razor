@@ -7,6 +7,7 @@
 @inject TestPagePrinter TestPage
 @inject HawkerPaths Paths
 @inject Hawker.Web.Updates.UpdateService Updates
+@inject Hawker.Web.Updates.UpdateDialog UpdateDialog
 @implements IDisposable
 
 <PageTitle>Settings · Hawker</PageTitle>
@@ -196,7 +197,7 @@
         <div class="row">
             @if (Updates.IsUpdateAvailable)
             {
-                <button class="btn btn-primary" @onclick="Updates.RequestOpen">See what's new</button>
+                <button class="btn btn-primary" @onclick="UpdateDialog.Open">See what's new</button>
             }
             <button class="btn" @onclick="CheckForUpdatesAsync" disabled="@(Updates.Status == Hawker.Web.Updates.UpdateStatus.Checking)">
                 @(Updates.Status == Hawker.Web.Updates.UpdateStatus.Checking ? "Checking…" : "Check now")

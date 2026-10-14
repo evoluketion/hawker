@@ -1,29 +1,9 @@
 @using Hawker.Web.Updates
 @implements IDisposable
 @inject UpdateService Updates
+@inject UpdateDialog Dialog
 
-@* The top-right update badge, the update dialog, and how the last update went. *@
-
-@if (Updates.IsUpdateAvailable || Updates.Status is UpdateStatus.Downloading or UpdateStatus.Restarting)
-{
-    <div class="topbar">
-        <button class="update-pill" @onclick="Open" title="See what's new and install it">
-            @switch (Updates.Status)
-            {
-                case UpdateStatus.Downloading:
-                    <span>Downloading update@(Updates.Progress is { } p ? $" {p:P0}" : "…")</span>
-                    break;
-                case UpdateStatus.Restarting:
-                    <span>Restarting…</span>
-                    break;
-                default:
-                    <span class="update-dot" aria-hidden="true"></span>
-                    <span>Update available: <strong>@Updates.Latest!.Tag</strong></span>
-                    break;
-            }
-        </button>
-    </div>
-}
+@* The update dialog, and how the last update went. The sidebar's UpdateBadge opens the dialog. *@
 
 @if (Updates.LastResult is { } result)
 {
@@ -102,7 +82,7 @@
     protected override void OnInitialized()
     {
         Updates.Changed += OnChanged;
-        Updates.OpenRequested += OnOpenRequested;
+        Dialog.OpenRequested += OnOpenRequested;
     }
 
     // Only a live page takes the prompt; the first, prerendered pass of a page would use it up unseen.
@@ -131,8 +111,6 @@
         StateHasChanged();
     });
 
-    private void Open() => _open = true;
-
     private void Close() => _open = false;
 
     // Runs on in the background, so the restart goes ahead even if this page is closed.
@@ -141,6 +119,6 @@
     public void Dispose()
     {
         Updates.Changed -= OnChanged;
-        Updates.OpenRequested -= OnOpenRequested;
+        Dialog.OpenRequested -= OnOpenRequested;
     }
 }
