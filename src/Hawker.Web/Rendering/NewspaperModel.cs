@@ -1,6 +1,7 @@
 using System.Globalization;
 using Hawker.Core.Articles;
 using Hawker.Core.Domain;
+using Hawker.Core.Feeds;
 using Hawker.Core.Layout;
 using QRCoder;
 
@@ -104,7 +105,7 @@ public static class NewspaperModelBuilder
             item.ShowImage ? article.LeadImage : null,
             blocks,
             truncated,
-            QrSvg(article.Url),
+            QrSvg(UrlNormalizer.StripTracking(article.Url)),
             ShortUrl(article.Url),
             MetaLine(article, timeZone));
     }

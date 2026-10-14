@@ -76,6 +76,16 @@ public class NewspaperRenderingTests
     }
 
     [Fact]
+    public void Qr_code_link_has_tracking_parameters_removed()
+    {
+        var article = Make("a1") with { Url = "https://news.example.com/a1?utm_source=rss" };
+
+        var story = Model(new LayoutPlan(new LayoutItem("a1", StorySize.Lead, true, null), []), [article]).Lead;
+
+        Assert.Equal(NewspaperModelBuilder.QrSvg("https://news.example.com/a1"), story.QrSvg);
+    }
+
+    [Fact]
     public void Body_figures_print_only_in_wide_stories_and_never_dangle_after_a_cut()
     {
         var baseArticle = Make("a1", paragraphs: [100, 100, 100]);

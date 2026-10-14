@@ -16,6 +16,18 @@ public class UrlNormalizerTests
         Assert.Equal(expected, UrlNormalizer.Normalize(input));
     }
 
+    [Theory]
+    [InlineData("https://www.example.com/story?utm_source=rss&utm_medium=feed", "https://www.example.com/story")]
+    [InlineData("https://example.com/story?b=2&fbclid=abc&a=1", "https://example.com/story?b=2&a=1")]
+    [InlineData("https://example.com/story?UTM_Campaign=x&id=5#comments", "https://example.com/story?id=5#comments")]
+    [InlineData("https://example.com/story?id=5", "https://example.com/story?id=5")]
+    [InlineData("https://example.com/story", "https://example.com/story")]
+    [InlineData("not a url?utm_source=rss", "not a url?utm_source=rss")]
+    public void Strips_only_tracking_parameters(string input, string expected)
+    {
+        Assert.Equal(expected, UrlNormalizer.StripTracking(input));
+    }
+
     [Fact]
     public void Equivalent_urls_share_a_hash()
     {
