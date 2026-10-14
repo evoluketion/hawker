@@ -12,6 +12,7 @@ using Hawker.Web.Printing;
 using Hawker.Web.Rendering;
 using Hawker.Web.Settings;
 using Hawker.Web.Tray;
+using Hawker.Web.Tray.Linux;
 using Hawker.Web.Tray.Windows;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.EntityFrameworkCore;
@@ -95,6 +96,10 @@ builder.Services.AddHostedService<TrayHostedService>();
 if (OperatingSystem.IsWindows())
 {
     builder.Services.AddSingleton<ITrayIcon, WindowsTrayIcon>();
+}
+else if (OperatingSystem.IsLinux())
+{
+    builder.Services.AddSingleton<ITrayIcon, StatusNotifierTrayIcon>();
 }
 else
 {
