@@ -40,6 +40,8 @@ public static class ClaudeLayoutPrompt
           "Continued online" QR code. 0 means print the whole story. Cut at a natural break: after the opening has made the
           story's point, never mid-argument where a quote is being introduced. Rough word budgets: lead ~550, major ~380,
           minor ~220, brief: just the first block. A story only slightly over budget can be printed whole.
+          A minor printing more than about 450 words (370 with its picture) is too tall for a half-width column and is set
+          full width instead, so either cut it with keep_blocks or make it a major.
 
         The input lists articles in ranked order (the edition's ranking by recency or popularity); treat rank as a signal of
         importance, not a rule. Place every article exactly once: the lead must not appear again in a section.

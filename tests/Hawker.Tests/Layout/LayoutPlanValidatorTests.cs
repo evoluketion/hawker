@@ -122,4 +122,68 @@ public class LayoutPlanValidatorTests
         Assert.Equal(["World", LayoutPlanValidator.FallbackSectionName], result.Plan.Sections.Select(s => s.Name));
         Assert.Equal(["a2", "a4"], result.Plan.Sections[0].Items.Select(i => i.ArticleId));
     }
+
+    [Theory]
+    [InlineData(true, true, LayoutPlanValidator.MinorMaxWordsWithImage, StorySize.Minor)]
+    [InlineData(true, true, LayoutPlanValidator.MinorMaxWordsWithImage + 1, StorySize.Major)]
+    [InlineData(false, false, LayoutPlanValidator.MinorMaxWords, StorySize.Minor)]
+    [InlineData(false, false, LayoutPlanValidator.MinorMaxWords + 1, StorySize.Major)]
+    [InlineData(true, false, 400, StorySize.Minor)] // the limit follows the image that prints
+    [InlineData(true, true, 200, StorySize.Minor)]
+    public void Minors_too_long_for_a_page_are_widened(bool hasImage, bool showImage, int words, StorySize expected)
+    {
+        IReadOnlyList<Article> articles = [Make("a1"), Make("a2", paragraphs: [words - 100, 100], image: hasImage)];
+        var plan = new LayoutPlan(Item("a1", StorySize.Lead), [new LayoutSection("World", [Item("a2", image: showImage)])]);
+
+        var result = LayoutPlanValidator.Validate(plan, articles);
+
+        Assert.Equal(expected, result.Plan.Sections[0].Items[0].Size);
+        var widened = "Widened 'a2' to full width; too long for a half-width column.";
+        if (expected == StorySize.Major)
+        {
+            Assert.Contains(widened, result.Corrections);
+        }
+        else
+        {
+            Assert.Empty(result.Corrections);
+        }
+    }
+
+    [Fact]
+    public void A_long_minor_cut_under_the_limit_stays_half_width()
+    {
+        IReadOnlyList<Article> articles = [Make("a1"), Make("a2", paragraphs: [200, 200, 200], image: false)];
+        var plan = new LayoutPlan(Item("a1", StorySize.Lead), [new LayoutSection("World", [Item("a2", image: false, keep: 2)])]);
+
+        var result = LayoutPlanValidator.Validate(plan, articles);
+
+        Assert.Equal(StorySize.Minor, result.Plan.Sections[0].Items[0].Size);
+        Assert.Empty(result.Corrections);
+    }
+
+    [Fact]
+    public void A_long_article_the_plan_left_out_is_added_full_width()
+    {
+        IReadOnlyList<Article> articles = [Make("a1"), Make("a2", paragraphs: [300, 300])];
+        var plan = new LayoutPlan(Item("a1", StorySize.Lead), []);
+
+        var result = LayoutPlanValidator.Validate(plan, articles);
+
+        Assert.Equal(StorySize.Major, result.Plan.Sections.Single().Items.Single().Size);
+    }
+
+    [Theory]
+    [InlineData(StorySize.Major)]
+    [InlineData(StorySize.Brief)]
+    public void Only_minors_are_widened(StorySize size)
+    {
+        IReadOnlyList<Article> articles = [Make("a1", paragraphs: [600, 600]), Make("a2", paragraphs: [600, 600])];
+        var plan = new LayoutPlan(Item("a1", StorySize.Lead), [new LayoutSection("World", [Item("a2", size)])]);
+
+        var result = LayoutPlanValidator.Validate(plan, articles);
+
+        Assert.Equal(StorySize.Lead, result.Plan.Lead.Size);
+        Assert.Equal(size, result.Plan.Sections[0].Items[0].Size);
+        Assert.Empty(result.Corrections);
+    }
 }
