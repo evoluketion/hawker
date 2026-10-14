@@ -16,8 +16,9 @@ public class NewspaperRenderingTests
 {
     private static readonly DateTimeOffset Now = new(2026, 10, 5, 6, 0, 0, TimeSpan.Zero);
 
-    private static NewspaperModel Model(LayoutPlan plan, IReadOnlyList<Article> articles, PaperSize paper = PaperSize.A4, string name = "The Morning Hawker") =>
-        NewspaperModelBuilder.Build(name, 12, paper, Now, TimeZoneInfo.Utc, plan, articles);
+    private static NewspaperModel Model(LayoutPlan plan, IReadOnlyList<Article> articles, PaperSize paper = PaperSize.A4, string name = "The Morning Hawker",
+        bool qrCodesOnWholeStories = true) =>
+        NewspaperModelBuilder.Build(name, 12, paper, Now, TimeZoneInfo.Utc, plan, articles, qrCodesOnWholeStories);
 
     private static async Task<string> RenderAsync(NewspaperModel model)
     {
@@ -44,17 +45,64 @@ public class NewspaperRenderingTests
     }
 
     [Fact]
-    public void Whole_stories_have_no_qr_code_but_briefs_and_headline_only_stories_do()
+    public void Every_story_has_a_qr_code_whether_whole_cut_brief_or_headline_only()
     {
-        Article[] articles = [Make("a1"), Make("a2"), Make("a3", paragraphs: [])];
+        Article[] articles = [Make("a1"), Make("a2"), Make("a3", paragraphs: []), Make("a4", paragraphs: [100, 100, 100])];
         var plan = new LayoutPlan(new LayoutItem("a1", StorySize.Lead, true, null),
-            [new LayoutSection("News", [new LayoutItem("a2", StorySize.Brief, false, 1), new LayoutItem("a3", StorySize.Minor, false, null)])]);
+            [new LayoutSection("News", [
+                new LayoutItem("a2", StorySize.Brief, false, 1),
+                new LayoutItem("a3", StorySize.Minor, false, null),
+                new LayoutItem("a4", StorySize.Major, false, 1)])]);
 
         var model = Model(plan, articles);
+        var section = model.Sections[0];
+
+        Assert.False(model.Lead.Truncated);
+        Assert.Contains("<svg", model.Lead.QrSvg);
+        Assert.Contains("<svg", section.Briefs.Single().QrSvg);
+        Assert.Contains("<svg", section.Minors.Single().QrSvg);
+        Assert.True(section.Majors.Single().Truncated);
+        Assert.Contains("<svg", section.Majors.Single().QrSvg);
+    }
+
+    [Fact]
+    public void With_the_setting_off_only_whole_stories_lose_their_qr_code()
+    {
+        Article[] articles = [Make("a1"), Make("a2"), Make("a3", paragraphs: []), Make("a4", paragraphs: [100, 100, 100])];
+        var plan = new LayoutPlan(new LayoutItem("a1", StorySize.Lead, true, null),
+            [new LayoutSection("News", [
+                new LayoutItem("a2", StorySize.Brief, false, 1),
+                new LayoutItem("a3", StorySize.Minor, false, null),
+                new LayoutItem("a4", StorySize.Major, false, 1)])]);
+
+        var model = Model(plan, articles, qrCodesOnWholeStories: false);
+        var section = model.Sections[0];
 
         Assert.Null(model.Lead.QrSvg);
-        Assert.NotNull(model.Sections[0].Briefs.Single().QrSvg);
-        Assert.NotNull(model.Sections[0].Minors.Single().QrSvg);
+        Assert.NotNull(section.Briefs.Single().QrSvg);
+        Assert.NotNull(section.Minors.Single().QrSvg);
+        Assert.NotNull(section.Majors.Single().QrSvg);
+    }
+
+    [Fact]
+    public void Qr_code_links_to_the_article_rather_than_its_comments()
+    {
+        var article = Make("a1") with { CommentsUrl = "https://news.ycombinator.com/item?id=1" };
+
+        var story = Model(new LayoutPlan(new LayoutItem("a1", StorySize.Lead, true, null), []), [article]).Lead;
+
+        Assert.Equal(NewspaperModelBuilder.QrSvg(article.Url), story.QrSvg);
+        Assert.NotEqual(NewspaperModelBuilder.QrSvg(article.CommentsUrl!), story.QrSvg);
+    }
+
+    [Fact]
+    public void Qr_code_link_has_tracking_parameters_removed()
+    {
+        var article = Make("a1") with { Url = "https://news.example.com/a1?utm_source=rss" };
+
+        var story = Model(new LayoutPlan(new LayoutItem("a1", StorySize.Lead, true, null), []), [article]).Lead;
+
+        Assert.Equal(NewspaperModelBuilder.QrSvg("https://news.example.com/a1"), story.QrSvg);
     }
 
     [Fact]
@@ -108,6 +156,7 @@ public class NewspaperRenderingTests
         Assert.DoesNotContain("<script>alert(1)", html);
         Assert.Contains("class=\"section-head\">Hacker News</h2>", html);
         Assert.Contains("In brief", html);
+        Assert.Contains("Read online", html);
         Assert.Contains("a2 paragraph 1:", html);
         Assert.Contains("@font-face", html);
     }

@@ -1,6 +1,7 @@
 using System.Globalization;
 using Hawker.Core.Articles;
 using Hawker.Core.Domain;
+using Hawker.Core.Feeds;
 using Hawker.Core.Layout;
 using QRCoder;
 
@@ -45,10 +46,11 @@ public static class NewspaperModelBuilder
         DateTimeOffset now,
         TimeZoneInfo timeZone,
         LayoutPlan plan,
-        IReadOnlyList<Article> articles)
+        IReadOnlyList<Article> articles,
+        bool qrCodesOnWholeStories)
     {
         var byId = articles.ToDictionary(a => a.Id);
-        StoryView Story(LayoutItem item) => BuildStory(item, byId[item.ArticleId], timeZone);
+        StoryView Story(LayoutItem item) => BuildStory(item, byId[item.ArticleId], timeZone, qrCodesOnWholeStories);
 
         var sections = plan.Sections
             .Select(s => new SectionView(
@@ -61,7 +63,7 @@ public static class NewspaperModelBuilder
         return new NewspaperModel(editionName, TimeZoneInfo.ConvertTime(now, timeZone), issueNumber, paperSize, Story(plan.Lead), sections);
     }
 
-    private static StoryView BuildStory(LayoutItem item, Article article, TimeZoneInfo timeZone)
+    private static StoryView BuildStory(LayoutItem item, Article article, TimeZoneInfo timeZone, bool qrCodesOnWholeStories)
     {
         var bodyImages = article.BodyImages.ToDictionary(i => i.Id);
         // Body pictures only fit in the wide stories; narrow ones keep just their text.
@@ -98,8 +100,8 @@ public static class NewspaperModelBuilder
             blocks.RemoveAt(blocks.Count - 1);
         }
 
-        // Briefs and headline-only stories always point online, since they print only part of the story (or none).
-        var needsQr = truncated || item.Size == StorySize.Brief || article.BodySource == BodySource.None;
+        // Briefs and headline-only stories print only part of the story (or none), so they always point online.
+        var needsQr = qrCodesOnWholeStories || truncated || item.Size == StorySize.Brief || article.BodySource == BodySource.None;
 
         return new StoryView(
             article,
@@ -107,7 +109,7 @@ public static class NewspaperModelBuilder
             item.ShowImage ? article.LeadImage : null,
             blocks,
             truncated,
-            needsQr ? QrSvg(article.Url) : null,
+            needsQr ? QrSvg(UrlNormalizer.StripTracking(article.Url)) : null,
             ShortUrl(article.Url),
             MetaLine(article, timeZone));
     }
@@ -153,7 +155,7 @@ public static class NewspaperModelBuilder
         return shortUrl.Length <= 48 ? shortUrl : shortUrl[..47] + "…";
     }
 
-    private static string QrSvg(string url)
+    public static string QrSvg(string url)
     {
         using var generator = new QRCodeGenerator();
         using var data = generator.CreateQrCode(url, QRCodeGenerator.ECCLevel.M);

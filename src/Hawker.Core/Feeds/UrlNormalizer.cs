@@ -15,10 +15,7 @@ public static class UrlNormalizer
             return url.Trim();
         }
 
-        var query = string.Join('&', uri.Query.TrimStart('?')
-            .Split('&', StringSplitOptions.RemoveEmptyEntries)
-            .Where(p => !TrackingPrefixes.Any(t => p.StartsWith(t, StringComparison.OrdinalIgnoreCase)))
-            .Order(StringComparer.Ordinal));
+        var query = string.Join('&', KeptParameters(uri.Query.TrimStart('?')).Order(StringComparer.Ordinal));
 
         var host = uri.Host.ToLowerInvariant();
         if (host.StartsWith("www."))
@@ -32,6 +29,32 @@ public static class UrlNormalizer
         // http and https versions of a page are treated as the same article.
         return $"{host}{port}{path}{(query.Length > 0 ? "?" + query : "")}";
     }
+
+    /// <summary>Removes tracking parameters, leaving the rest of the URL exactly as it was so it still opens.</summary>
+    public static string StripTracking(string url)
+    {
+        if (!Uri.TryCreate(url, UriKind.Absolute, out _))
+        {
+            return url;
+        }
+
+        var hashAt = url.IndexOf('#');
+        var fragment = hashAt < 0 ? "" : url[hashAt..];
+        var beforeFragment = hashAt < 0 ? url : url[..hashAt];
+
+        var queryAt = beforeFragment.IndexOf('?');
+        if (queryAt < 0)
+        {
+            return url;
+        }
+
+        var query = string.Join('&', KeptParameters(beforeFragment[(queryAt + 1)..]));
+        return $"{beforeFragment[..queryAt]}{(query.Length > 0 ? "?" + query : "")}{fragment}";
+    }
+
+    private static IEnumerable<string> KeptParameters(string query) =>
+        query.Split('&', StringSplitOptions.RemoveEmptyEntries)
+            .Where(p => !TrackingPrefixes.Any(t => p.StartsWith(t, StringComparison.OrdinalIgnoreCase)));
 
     public static string Hash(string url) =>
         Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(Normalize(url))));

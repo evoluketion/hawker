@@ -2,6 +2,8 @@ using Hawker.Core.Data;
 using Hawker.Core.Domain;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 
 namespace Hawker.Tests;
 
@@ -70,6 +72,23 @@ public sealed class HawkerDbContextTests : IDisposable
             Assert.Equal(started, run.StartedAt);
             Assert.Equal(["https://example.com/a"], run.ArticleUrls);
         }
+    }
+
+    [Fact]
+    public void Editions_made_before_the_qr_setting_existed_keep_qr_codes_on_whole_stories()
+    {
+        using (var db = new HawkerDbContext(new DbContextOptionsBuilder<HawkerDbContext>().UseSqlite(_connection).Options))
+        {
+            db.GetService<IMigrator>().Migrate("20261008090450_EditionPaperSource");
+            db.Database.ExecuteSqlRaw("""
+                INSERT INTO Editions (Name, Enabled, TimeZone, ArticleCount, SortMode, LookbackHours, PaperSize, Greyscale, Copies, Duplex, AutoPrint, IssueCounter)
+                VALUES ('Old', 1, 'UTC', 10, 'MostRecent', 24, 'A4', 0, 1, 1, 1, 0)
+                """);
+        }
+
+        using var migrated = CreateContext();
+
+        Assert.True(migrated.Editions.Single().QrCodesOnWholeStories);
     }
 
     [Fact]

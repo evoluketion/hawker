@@ -113,6 +113,9 @@ namespace Hawker.Core.Data.Migrations
                     b.Property<string>("PrinterName")
                         .HasColumnType("TEXT");
 
+                    b.Property<bool>("QrCodesOnWholeStories")
+                        .HasColumnType("INTEGER");
+
                     b.Property<string>("SortMode")
                         .IsRequired()
                         .HasColumnType("TEXT");

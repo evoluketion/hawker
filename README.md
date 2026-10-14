@@ -2,7 +2,7 @@
 
 Hawker turns your RSS feeds into a printed newspaper. On the schedule you choose, it gathers the latest stories, lays them out like a broadsheet and sends the paper to your printer, ready to staple.
 
-Hawker never writes, rewrites or summarises anything. Headlines and articles print exactly as their sources published them. If you add a Claude API key, Claude acts only as the layout editor: it picks the front-page story, groups stories into sections and decides where long stories are cut, with a QR code linking to the rest online.
+Hawker never writes, rewrites or summarises anything. Headlines and articles print exactly as their sources published them. If you add a Claude API key, Claude acts only as the layout editor: it picks the front-page story, groups stories into sections and decides where long stories are cut.
 
 ## What it does
 
@@ -13,6 +13,7 @@ Hawker never writes, rewrites or summarises anything. Headlines and articles pri
   - **How far back to look:** 12 hours, 24 hours, 2 days, 3 days, 1 week or custom.
   - **When it prints:** once a day, several times a day, weekly on chosen days, monthly, or a custom cron expression, in any time zone.
   - **Printing:** printer, copies, double-sided, A4 or Letter, and black-and-white pictures.
+- **QR codes:** every story ends with a QR code to its original article, so it can be read or shared online. Cut stories say "Continued online".
 - **Archive:** every paper is saved as a PDF. Open, download or print any of them again.
 - **Previews:** build a paper without printing it.
 
