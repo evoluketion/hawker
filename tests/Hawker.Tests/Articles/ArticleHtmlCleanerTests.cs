@@ -68,6 +68,18 @@ public class ArticleHtmlCleanerTests
     }
 
     [Fact]
+    public void Paragraphs_that_are_only_a_link_address_are_dropped()
+    {
+        var body = Clean("""
+            <p>&lt;a href="https://medium.com/media/e93d74e6/href"&gt;https://medium.com/media/e93d74e6/href&lt;/a&gt;</p>
+            <p><a href="https://example.com/x">https://example.com/x</a></p>
+            <p>See https://example.com/report for the full figures.</p>
+            """);
+
+        Assert.Equal(["<p>See https://example.com/report for the full figures.</p>"], Html(body));
+    }
+
+    [Fact]
     public void Headings_quotes_lists_and_code_are_kept_as_blocks()
     {
         var body = Clean("""

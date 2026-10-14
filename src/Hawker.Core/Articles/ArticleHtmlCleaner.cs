@@ -159,7 +159,8 @@ public static partial class ArticleHtmlCleaner
         private void AddTextBlock(BlockKind kind, string tag, string innerHtml)
         {
             var inner = Tidy(innerHtml);
-            if (PlainText(inner).Length == 0)
+            var text = PlainText(inner);
+            if (text.Length == 0 || (kind == BlockKind.Paragraph && BareLink().IsMatch(text)))
             {
                 return;
             }
@@ -369,6 +370,10 @@ public static partial class ArticleHtmlCleaner
 
     [GeneratedRegex(@"\s+")]
     private static partial Regex WhiteSpace();
+
+    // A paragraph that is only an address, often an embed the site printed as escaped markup: <a href="…">…</a>.
+    [GeneratedRegex(@"^(<a\s[^>]*>)?\s*https?://\S+?\s*(</a>)?$", RegexOptions.IgnoreCase)]
+    private static partial Regex BareLink();
 
     [GeneratedRegex(@"<[^>]+>")]
     private static partial Regex Tag();

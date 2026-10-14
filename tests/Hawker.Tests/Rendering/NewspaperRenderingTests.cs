@@ -266,6 +266,37 @@ public class NewspaperRenderingTests
         });
     }
 
+    [Fact]
+    [Trait("Category", "Browser")]
+    public async Task A_long_unbreakable_string_stays_inside_its_own_column()
+    {
+        var url = "https://medium.com/media/" + new string('e', 120) + "/href";
+        Article[] articles =
+        [
+            Prose("lead", 300, image: false),
+            Prose("left", 200, image: false),
+            Prose("right", 200, image: false) with { Blocks = [new ArticleBlock(BlockKind.Paragraph, $"<p>Watch it at {url} today.</p>", 4)] },
+        ];
+        var proposed = new LayoutPlan(new LayoutItem("lead", StorySize.Lead, true, null),
+            [new LayoutSection("World", articles.Skip(1).Select(a => new LayoutItem(a.Id, StorySize.Minor, true, null)).ToList())]);
+        var html = await RenderAsync(Model(LayoutPlanValidator.Validate(proposed, articles).Plan, articles));
+
+        using var playwright = await Microsoft.Playwright.Playwright.CreateAsync();
+        await using var browser = await playwright.Chromium.LaunchAsync(new() { Headless = true });
+        var page = await browser.NewPageAsync();
+        var widthPx = (int)Math.Floor(PdfRenderer.ContentWidthMm(PaperSize.A4) * 96 / 25.4);
+        await page.SetViewportSizeAsync(widthPx, 1000);
+        await page.EmulateMediaAsync(new() { Media = Microsoft.Playwright.Media.Print });
+        await page.SetContentAsync(html);
+        var widths = await page.EvaluateAsync<double[]>("""
+            () => [...document.querySelectorAll('.story--minor')].map(s => Math.max(s.getBoundingClientRect().width, s.scrollWidth))
+            """);
+
+        Assert.Equal(2, widths.Length);
+        Assert.All(widths, w => Assert.True(w <= widthPx / 2.0, $"A half-width story is {w:F0}px wide on a {widthPx}px page"));
+        Assert.True(Math.Abs(widths[0] - widths[1]) < 1, $"Columns of {widths[0]:F0}px and {widths[1]:F0}px");
+    }
+
     /// <summary>An article of ordinary-looking prose, since word lengths decide how tall a column runs.</summary>
     private static Article Prose(string id, int words, bool image)
     {

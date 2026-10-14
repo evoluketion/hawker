@@ -101,6 +101,7 @@ body {
   letter-spacing: -0.005em;
   break-after: avoid;
   text-wrap: balance;
+  overflow-wrap: break-word;
 }
 
 .meta {
@@ -130,7 +131,7 @@ figcaption {
   margin-top: 0.8mm;
 }
 
-.body { column-gap: var(--gutter); column-rule: 0.4pt solid var(--rule-light); orphans: 2; widows: 2; }
+.body { column-gap: var(--gutter); column-rule: 0.4pt solid var(--rule-light); orphans: 2; widows: 2; overflow-wrap: break-word; }
 
 .body p {
   margin: 0;
@@ -229,7 +230,8 @@ figcaption {
 /* Minor: half width, two to a row. */
 .minors {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  /* minmax(0, …): a long URL or code line in one story must not widen its column for every story on the page. */
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   column-gap: 6mm;
   row-gap: 4mm;
   margin-bottom: 4mm;
@@ -264,7 +266,7 @@ figcaption {
   border-bottom: 0.4pt solid var(--rule);
 }
 
-.briefs-grid { display: grid; grid-template-columns: repeat(3, 1fr); column-gap: 5mm; row-gap: 3mm; }
+.briefs-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); column-gap: 5mm; row-gap: 3mm; }
 
 .story--brief { break-inside: avoid; }
 .story--brief .headline { font-size: 10.5pt; font-weight: 700; }
