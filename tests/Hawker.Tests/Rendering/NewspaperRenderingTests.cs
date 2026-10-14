@@ -297,6 +297,35 @@ public class NewspaperRenderingTests
         Assert.True(Math.Abs(widths[0] - widths[1]) < 1, $"Columns of {widths[0]:F0}px and {widths[1]:F0}px");
     }
 
+    [Fact]
+    [Trait("Category", "Browser")]
+    public async Task Headlines_and_bylines_never_split_across_pages()
+    {
+        Article[] articles = [Prose("lead", 300, image: false), Prose("major", 600, image: false), Prose("left", 200, image: false), Prose("right", 200, image: false), Make("brief")];
+        var proposed = new LayoutPlan(new LayoutItem("lead", StorySize.Lead, true, null),
+        [
+            new LayoutSection("World",
+            [
+                new LayoutItem("major", StorySize.Major, true, null), new LayoutItem("left", StorySize.Minor, true, null),
+                new LayoutItem("right", StorySize.Minor, true, null), new LayoutItem("brief", StorySize.Brief, false, null),
+            ]),
+        ]);
+        var html = await RenderAsync(Model(LayoutPlanValidator.Validate(proposed, articles).Plan, articles));
+
+        using var playwright = await Microsoft.Playwright.Playwright.CreateAsync();
+        await using var browser = await playwright.Chromium.LaunchAsync(new() { Headless = true });
+        var page = await browser.NewPageAsync();
+        await page.EmulateMediaAsync(new() { Media = Microsoft.Playwright.Media.Print });
+        await page.SetContentAsync(html);
+        var styles = await page.EvaluateAsync<string[]>("""
+            () => [...document.querySelectorAll('.headline, .meta')].map(e =>
+              `${e.closest('.story').className} ${e.className}: ${getComputedStyle(e).breakInside}/${getComputedStyle(e).breakAfter}`)
+            """);
+
+        Assert.Equal(10, styles.Length);
+        Assert.All(styles, s => Assert.EndsWith(": avoid/avoid", s));
+    }
+
     /// <summary>An article of ordinary-looking prose, since word lengths decide how tall a column runs.</summary>
     private static Article Prose(string id, int words, bool image)
     {
