@@ -27,6 +27,12 @@ for rid in "${rids[@]}"; do
   dotnet publish "$root/src/Hawker.Web" -c Release -r "$rid" --self-contained \
     -p:Version="$version" -p:DebugType=None -p:DebugSymbols=false -o "$out" --nologo -v quiet
 
+  # Without it the dashboard loads but nothing on it can be clicked.
+  if [[ ! -f "$out/wwwroot/_framework/blazor.web.js" ]]; then
+    echo "error: $name is missing wwwroot/_framework/blazor.web.js" >&2
+    exit 1
+  fi
+
   # Some native packages ship their own debug symbols.
   find "$out" -name '*.pdb' -delete
   cp "$root/README.md" "$root/THIRD-PARTY-NOTICES.md" "$out/"

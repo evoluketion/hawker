@@ -51,4 +51,22 @@
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>
 
+  <!-- The package that adds _framework/blazor.web.js only does so for Exe projects, so a WinExe build ships without
+       it and no button works. Present as Exe for just that target. Its condition is checked before any BeforeTargets
+       run, so the switch has to come earlier in the same dependency list. -->
+  <PropertyGroup>
+    <ResolveStaticWebAssetsInputsDependsOn>_PresentAsExeForBlazorFramework;$(ResolveStaticWebAssetsInputsDependsOn)</ResolveStaticWebAssetsInputsDependsOn>
+  </PropertyGroup>
+  <Target Name="_PresentAsExeForBlazorFramework" Condition="'$(OutputType)' == 'WinExe'">
+    <PropertyGroup>
+      <_HawkerRestoreWinExe>true</_HawkerRestoreWinExe>
+      <OutputType>Exe</OutputType>
+    </PropertyGroup>
+  </Target>
+  <Target Name="_RestoreWinExeAfterBlazorFramework" AfterTargets="_AddBlazorFrameworkStaticWebAssets" Condition="'$(_HawkerRestoreWinExe)' == 'true'">
+    <PropertyGroup>
+      <OutputType>WinExe</OutputType>
+    </PropertyGroup>
+  </Target>
+
 </Project>
