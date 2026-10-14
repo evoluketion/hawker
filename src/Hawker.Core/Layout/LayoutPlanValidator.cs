@@ -7,7 +7,7 @@ public sealed record ValidatedPlan(LayoutPlan Plan, IReadOnlyList<string> Correc
 /// <summary>
 /// Makes any proposed plan safe to render: every article appears exactly once, unknown IDs are dropped, there is one
 /// lead, cut points are within the story, images are only requested where they exist, and half-width stories are short
-/// enough to fit on one page.
+/// enough to fit on one page. Pages that are not articles never lead and print as briefs.
 /// </summary>
 public static class LayoutPlanValidator
 {
@@ -87,6 +87,8 @@ public static class LayoutPlanValidator
             }
         }
 
+        lead = KeepNonArticlesOffTheLead(lead, articles, sections, placed, corrections);
+
         var missing = articles.Where(a => !placed.Contains(a.Id)).ToList();
         if (missing.Count > 0)
         {
@@ -113,6 +115,12 @@ public static class LayoutPlanValidator
     /// </summary>
     private static LayoutItem Fix(LayoutItem item, Article article, List<string> corrections)
     {
+        if (article.Page.Kind == PageKind.NotArticle && item.Size is StorySize.Major or StorySize.Minor)
+        {
+            item = item with { Size = StorySize.Brief };
+            corrections.Add($"Set '{item.ArticleId}' as a brief; it is not an article.");
+        }
+
         var textBlocks = article.Blocks.Count(b => b.Kind != BlockKind.Figure);
         int? keep = item.KeepBlocks;
 
@@ -141,6 +149,41 @@ public static class LayoutPlanValidator
         }
 
         return item with { Size = size, ShowImage = showImage, KeepBlocks = keep };
+    }
+
+    /// <summary>
+    /// A product page, tool or the like never leads while a real story is available: the two swap places, and the page
+    /// takes the story's spot as a brief.
+    /// </summary>
+    private static LayoutItem KeepNonArticlesOffTheLead(
+        LayoutItem lead, IReadOnlyList<Article> articles, List<(string Name, List<LayoutItem> Items)> sections, HashSet<string> placed, List<string> corrections)
+    {
+        if (articles.First(a => a.Id == lead.ArticleId).Page.Kind != PageKind.NotArticle)
+        {
+            return lead;
+        }
+
+        var replacement = DeterministicLayoutEditor.ChooseLead(articles);
+        if (replacement.Page.Kind == PageKind.NotArticle)
+        {
+            return lead;
+        }
+
+        var demoted = new LayoutItem(lead.ArticleId, StorySize.Brief, false, null);
+        var section = sections.FindIndex(s => s.Items.Any(i => i.ArticleId == replacement.Id));
+        if (section >= 0)
+        {
+            var items = sections[section].Items;
+            items[items.FindIndex(i => i.ArticleId == replacement.Id)] = demoted;
+        }
+        else
+        {
+            AddToSection(sections, FallbackSectionName, [demoted]);
+        }
+
+        placed.Add(replacement.Id);
+        corrections.Add($"Led with '{replacement.Id}' instead of '{lead.ArticleId}', which is not an article.");
+        return new LayoutItem(replacement.Id, StorySize.Lead, true, DeterministicLayoutEditor.KeepBlocks(replacement, DeterministicLayoutEditor.WordBudget(StorySize.Lead)));
     }
 
     private static void AddToSection(List<(string Name, List<LayoutItem> Items)> sections, string name, List<LayoutItem> items)

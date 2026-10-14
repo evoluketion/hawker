@@ -90,4 +90,31 @@ public class DeterministicLayoutEditorTests
 
         Assert.Empty(result.Corrections);
     }
+
+    [Fact]
+    public void A_page_that_is_not_an_article_never_leads_and_prints_as_a_brief()
+    {
+        Article[] articles = [Make("a1", page: PageKind.NotArticle), Make("a2", image: false), Make("a3")];
+
+        var plan = DeterministicLayoutEditor.Plan(articles);
+
+        Assert.Equal("a3", plan.Lead.ArticleId);
+        Assert.Equal(StorySize.Brief, plan.Sections.SelectMany(s => s.Items).Single(i => i.ArticleId == "a1").Size);
+    }
+
+    [Fact]
+    public void Real_reporting_leads_ahead_of_a_company_announcement()
+    {
+        Article[] articles = [Make("a1", page: PageKind.Announcement), Make("a2")];
+
+        Assert.Equal("a2", DeterministicLayoutEditor.Plan(articles).Lead.ArticleId);
+        Assert.Equal("a1", DeterministicLayoutEditor.Plan([articles[0], Make("a3", image: false)]).Lead.ArticleId);
+    }
+
+    [Fact]
+    public void A_non_article_leads_only_when_there_is_nothing_else()
+    {
+        Assert.Equal("a2", DeterministicLayoutEditor.Plan([Make("a1", page: PageKind.NotArticle), Make("a2", image: false)]).Lead.ArticleId);
+        Assert.Equal("a1", DeterministicLayoutEditor.Plan([Make("a1", page: PageKind.NotArticle), Make("a2", page: PageKind.NotArticle)]).Lead.ArticleId);
+    }
 }

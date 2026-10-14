@@ -33,12 +33,10 @@ public sealed class DeterministicLayoutEditor : ILayoutEditor
             throw new ArgumentException("An edition needs at least one article.", nameof(articles));
         }
 
-        // The highest-ranked story with a picture and some substance leads; otherwise simply the highest-ranked.
-        var leadArticle = articles.FirstOrDefault(a => a.LeadImage?.DataUri is not null && a.WordCount >= SubstantialWordCount)
-            ?? articles[0];
+        var leadArticle = ChooseLead(articles);
 
         var majors = articles
-            .Where(a => a != leadArticle && a.LeadImage?.DataUri is not null && a.WordCount >= SubstantialWordCount)
+            .Where(a => a != leadArticle && a.Page.Kind != PageKind.NotArticle && a.LeadImage?.DataUri is not null && a.WordCount >= SubstantialWordCount)
             .Take(MajorStoriesPerEdition)
             .ToHashSet();
 
@@ -54,6 +52,19 @@ public sealed class DeterministicLayoutEditor : ILayoutEditor
         return new LayoutPlan(Item(leadArticle, StorySize.Lead), sections);
     }
 
+    /// <summary>
+    /// The highest-ranked story with a picture and some substance leads, preferring real articles over a company's
+    /// announcement about itself. Product pages and the like never lead while there is anything else.
+    /// </summary>
+    public static Article ChooseLead(IReadOnlyList<Article> articles)
+    {
+        bool Substantial(Article a) => a.LeadImage?.DataUri is not null && a.WordCount >= SubstantialWordCount;
+        return articles.FirstOrDefault(a => a.Page.Kind == PageKind.Article && Substantial(a))
+            ?? articles.FirstOrDefault(a => a.Page.Kind == PageKind.Announcement && Substantial(a))
+            ?? articles.FirstOrDefault(a => a.Page.Kind != PageKind.NotArticle)
+            ?? articles[0];
+    }
+
     private static LayoutItem SizeFor(Article article, bool major)
     {
         if (major)
@@ -61,7 +72,7 @@ public sealed class DeterministicLayoutEditor : ILayoutEditor
             return Item(article, StorySize.Major);
         }
 
-        return article.WordCount < BriefWordThreshold
+        return article.WordCount < BriefWordThreshold || article.Page.Kind == PageKind.NotArticle
             ? Item(article, StorySize.Brief)
             : Item(article, StorySize.Minor);
     }

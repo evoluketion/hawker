@@ -34,6 +34,9 @@ public sealed record Article
 
     public BodySource BodySource { get; init; }
 
+    /// <summary>What kind of page the story came from. Pages that were not read count as articles.</summary>
+    public PageClassification Page { get; init; } = PageClassification.Article;
+
     public int WordCount => Blocks.Sum(b => b.WordCount);
     public int ParagraphCount => Blocks.Count(b => b.Kind == BlockKind.Paragraph);
 }

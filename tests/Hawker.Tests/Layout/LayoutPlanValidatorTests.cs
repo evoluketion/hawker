@@ -186,4 +186,29 @@ public class LayoutPlanValidatorTests
         Assert.Equal(size, result.Plan.Sections[0].Items[0].Size);
         Assert.Empty(result.Corrections);
     }
+
+    [Fact]
+    public void A_non_article_lead_swaps_places_with_the_best_real_story()
+    {
+        Article[] articles = [Make("a1", page: PageKind.NotArticle), Make("a2"), Make("a3")];
+        var plan = new LayoutPlan(Item("a1", StorySize.Lead), [new LayoutSection("World", [Item("a2", StorySize.Major), Item("a3")])]);
+
+        var result = LayoutPlanValidator.Validate(plan, articles);
+
+        Assert.Equal(("a2", StorySize.Lead), (result.Plan.Lead.ArticleId, result.Plan.Lead.Size));
+        Assert.Equal([("a1", StorySize.Brief), ("a3", StorySize.Minor)], result.Plan.Sections.Single().Items.Select(i => (i.ArticleId, i.Size)));
+        Assert.Contains("Led with 'a2' instead of 'a1', which is not an article.", result.Corrections);
+    }
+
+    [Fact]
+    public void A_non_article_is_set_as_a_brief()
+    {
+        Article[] articles = [Make("a1"), Make("a2", page: PageKind.NotArticle)];
+        var plan = new LayoutPlan(Item("a1", StorySize.Lead), [new LayoutSection("World", [Item("a2", StorySize.Major)])]);
+
+        var result = LayoutPlanValidator.Validate(plan, articles);
+
+        Assert.Equal(StorySize.Brief, result.Plan.Sections.Single().Items.Single().Size);
+        Assert.Contains("Set 'a2' as a brief; it is not an article.", result.Corrections);
+    }
 }

@@ -16,6 +16,9 @@ public class Feed
     /// <summary>Leave out rolling live-update pages, which extract as long runs of timestamped fragments.</summary>
     public bool SkipLiveBlogs { get; set; } = true;
 
+    /// <summary>Leave out stories whose page is clearly not an article: product and landing pages, tools, repositories.</summary>
+    public bool SkipNonArticlePages { get; set; }
+
     public ScoreSource ScoreSource { get; set; } = ScoreSource.Auto;
 
     /// <summary>Used when <see cref="ScoreSource"/> is Regex. Must contain a named group "score"; "comments" is optional.</summary>

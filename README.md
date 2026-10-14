@@ -6,7 +6,7 @@ Hawker never writes, rewrites or summarises anything. Headlines and articles pri
 
 ## What it does
 
-- **Feeds:** any RSS or Atom feed. Full articles are fetched from each story's web page, with the feed's own text as a fallback. Live blogs are skipped by default.
+- **Feeds:** any RSS or Atom feed. Full articles are fetched from each story's web page, with the feed's own text as a fallback. Live blogs are skipped by default. Pages that aren't articles, such as product pages, never lead the paper and print as briefs, and a feed can leave them out altogether.
 - **Editions:** a newspaper made from chosen feeds. For each edition you set:
   - **How many articles:** 5, 10, 15, 20, 30 or any number. Expect about 1½ stories per A4 page with pictures.
   - **Most recent or most popular:** popularity uses scores where feeds have them, such as Hacker News points through [hnrss.org](https://hnrss.org), with an optional minimum score.

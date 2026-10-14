@@ -12,7 +12,8 @@ public sealed record ComposedEdition(
     string Html,
     IReadOnlyList<Article> Articles,
     LayoutPlan Plan,
-    IReadOnlyList<string> Log);
+    IReadOnlyList<string> Log,
+    IReadOnlyList<string>? LeftOutUrlHashes = null);
 
 public sealed class NoArticlesException(string message, IReadOnlyList<string> log) : Exception(message)
 {
@@ -51,6 +52,10 @@ public sealed class EditionComposer(
         var imageOptions = new ImageOptions { Greyscale = edition.Greyscale };
         var prepared = await preparation.PrepareAsync(selected.Articles, edition.Feeds.ToDictionary(f => f.Id), imageOptions, cancellationToken);
         log.AddRange(prepared.Notes);
+        if (prepared.Articles.Count == 0)
+        {
+            throw new NoArticlesException("Every selected story was left out because its page is not an article.", log);
+        }
 
         var plan = await PlanAsync(edition, prepared.Articles, log, cancellationToken);
 
@@ -61,7 +66,7 @@ public sealed class EditionComposer(
         var pdf = await pdfRenderer.RenderAsync(html, edition.Name, edition.PaperSize, cancellationToken);
         log.Add($"Rendered {pdf.Length / 1024:N0} KB PDF.");
 
-        return new ComposedEdition(pdf, html, prepared.Articles, plan, log);
+        return new ComposedEdition(pdf, html, prepared.Articles, plan, log, prepared.LeftOut);
     }
 
     private async Task<LayoutPlan> PlanAsync(Edition edition, IReadOnlyList<Article> articles, List<string> log, CancellationToken cancellationToken)

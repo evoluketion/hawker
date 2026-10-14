@@ -30,6 +30,8 @@
             <span>Fetch the full article from its web page<br /><span class="hint">Recommended. Off uses only the text inside the feed, which is often just a summary.</span></span></label>
         <label class="check"><input type="checkbox" @bind="_feed.SkipLiveBlogs" />
             <span>Skip live blogs<br /><span class="hint">Rolling "– live" update pages print as long runs of timestamped fragments.</span></span></label>
+        <label class="check"><input type="checkbox" @bind="_feed.SkipNonArticlePages" />
+            <span>Leave out pages that aren't articles<br /><span class="hint">Product and landing pages, apps and code repositories. Even when kept, they never lead the paper and print as briefs.</span></span></label>
         <div class="field">
             <label for="cap">Most stories per edition</label>
             <input id="cap" type="number" min="1" @bind="_feed.MaxItemsPerRun" placeholder="No limit" />
