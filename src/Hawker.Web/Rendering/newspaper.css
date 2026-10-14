@@ -99,6 +99,7 @@ body {
   line-height: 1.06;
   margin: 0 0 1.2mm;
   letter-spacing: -0.005em;
+  break-inside: avoid;
   break-after: avoid;
   text-wrap: balance;
   overflow-wrap: break-word;
@@ -111,6 +112,7 @@ body {
   letter-spacing: 0.07em;
   color: var(--ink-soft);
   margin-bottom: 2mm;
+  break-inside: avoid;
   break-after: avoid;
 }
 
@@ -238,7 +240,7 @@ figcaption {
 }
 
 .story--minor { border-top: 0.6pt solid var(--ink); padding-top: 2mm; }
-.story--minor .headline, .story--minor .meta, .story--minor .lead-image { break-inside: avoid; break-after: avoid; }
+.story--minor .lead-image { break-after: avoid; }
 .story--minor .headline { font-size: 13.5pt; }
 .story--minor .lead-image img { max-height: 40mm; }
 .story--minor .body { column-count: 2; }
